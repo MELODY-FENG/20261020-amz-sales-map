@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VC异常排查方式</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --secondary: 17, 24, 39;
+    --deepblue: #1A3A5C;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0;
+    color:#000000;
+    min-height:100vh;
+    background-color:#F5F6F6;
+    background-image:
+      radial-gradient(60vw 55vh at 8% 12%, rgba(150, 205, 190, 0.30), rgba(150, 205, 190, 0) 62%),
+      radial-gradient(65vw 60vh at 50% 88%, rgba(198, 209, 213, 0.32), rgba(198, 209, 213, 0) 64%),
+      radial-gradient(58vw 55vh at 94% 18%, rgba(236, 197, 172, 0.28), rgba(236, 197, 172, 0) 62%),
+      linear-gradient(90deg, #EAF3F1 0%, #F5F6F6 50%, #FAEFE9 100%);
+    background-repeat:no-repeat;
+    background-attachment:fixed;
+    font-family:"Kantumruy Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .mono{ font-family:"Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .section{ position:relative; overflow:hidden; padding:34px 0 72px; }
+  .container{ margin:0 auto; max-width:100%; padding:0 20px; }
+  @media (min-width:768px){ .container{ padding:0 40px; } }
+
+  .heading{
+    margin:0 0 34px;
+    font-weight:700;
+    font-size:32px;
+    line-height:1.15;
+    letter-spacing:-0.02em;
+    color:var(--deepblue);
+  }
+  @media (min-width:768px){ .heading{ font-size:44px; line-height:1.05; } }
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:22px;
+    align-items:stretch;
+  }
+  @media (min-width:640px){  .grid{ grid-template-columns:repeat(2,1fr); } }
+  @media (min-width:1100px){ .grid{ grid-template-columns:repeat(4,1fr); } }
+
+  .card{ position:relative; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* 表现形式图片：由「表现形式」行的图片链接驱动，直接可视化 */
+  .thumb{
+    position:relative;
+    height:150px;
+    overflow:hidden;
+    border-radius:2px;
+    background:#eef1f4;
+  }
+  .thumb img{
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    cursor:zoom-in;
+    transition:transform 700ms ease-in-out;
+  }
+  .card:hover .thumb img{ transform:scale(1.05); }
+
+  /* ---------- 点击图片：放大查看（浏览器顶层，不受卡片边框限制） ---------- */
+  .zoomer{
+    position:fixed;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    max-width:100vw;
+    max-height:100vh;
+    margin:0;
+    padding:32px;
+    border:0;
+    background:transparent;
+    overflow:auto;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    cursor:zoom-out;
+  }
+  .zoomer[open]{ display:flex; }
+  .zoomer::backdrop{ background:rgba(12, 18, 26, 0.88); }
+  .zoomer img{
+    display:block;
+    max-width:92vw;
+    max-height:86vh;
+    width:auto;
+    height:auto;
+    border-radius:6px;
+    background:#ffffff;
+    box-shadow:0 28px 70px -24px rgba(0, 0, 0, 0.75);
+    cursor:default;
+  }
+  .zoomer .zoomer-close{
+    position:fixed;
+    top:16px;
+    right:20px;
+    width:38px;
+    height:38px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:0;
+    border-radius:50%;
+    background:rgba(255, 255, 255, 0.16);
+    color:#ffffff;
+    font-size:20px;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  .thumb.is-empty{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    padding:0 12px;
+    text-align:center;
+    background:linear-gradient(135deg,#eef1f4 0%,#e5e9ee 100%);
+    border:1px dashed rgba(var(--secondary), 0.16);
+  }
+  .thumb.is-empty .ph-title{
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.08em;
+    color:rgba(var(--secondary), 0.45);
+  }
+  .thumb.is-empty .ph-note{
+    font-size:10.5px;
+    line-height:1.5;
+    letter-spacing:0.04em;
+    color:rgba(var(--secondary), 0.32);
+  }
+
+  .body{ display:flex; flex-direction:column; padding:16px 0 0; flex:1; }
+
+  /* 异常主题 — 加粗，橙色，字号小于标题 */
+  .theme{
+    margin:0 0 8px;
+    font-weight:700;
+    font-size:21px;
+    line-height:1.25;
+    letter-spacing:-0.01em;
+    color:#E07B2F;
+  }
+  @media (min-width:1100px){ .theme{ font-size:20px; } }
+
+  /* 异常解读 + 体现形式 合并为一个板块（浅蓝底，深蓝 #1A3A5C 为参考深色） */
+  .detail{
+    margin:0 0 14px;
+    padding:11px 12px 12px;
+    border-radius:9px;
+    background:linear-gradient(180deg, #EFF4FA 0%, #E5EDF6 100%);
+    border:1px solid rgba(26, 58, 92, 0.13);
+  }
+  .detail-line{
+    margin:0;
+    font-size:13px;
+    line-height:1.6;
+    color:rgba(var(--secondary), 0.62);
+  }
+  .detail-line + .detail-line{ margin-top:7px; }
+  .detail-line.is-list{ font-size:12px; line-height:1.55; }
+  .detail-label{
+    display:inline-block;
+    margin-right:6px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    color:var(--deepblue);
+  }
+
+  /* 解决思路 — 标签（位置固定） */
+  .probe-label{
+    margin-top:0;
+    margin-bottom:7px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.14em;
+    color:rgba(var(--secondary), 0.55);
+  }
+
+  /* 灰色立体色块（高度固定，撑满卡片剩余空间） */
+  .probe{
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+    flex:1 1 auto;
+    padding:12px 13px 13px;
+    border-radius:10px;
+    border:1px solid rgba(var(--secondary), 0.09);
+    background:linear-gradient(180deg, #f6f7f9 0%, #e9ebef 55%, #e2e5ea 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255, 0.95),
+      inset 0 -2px 2px -1px rgba(var(--secondary), 0.07),
+      0 10px 18px -12px rgba(var(--secondary), 0.45),
+      0 2px 5px -3px rgba(var(--secondary), 0.22);
+  }
+  .probe-sec + .probe-sec{ margin-top:10px; }
+  .probe-h{
+    margin-bottom:5px;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.12em;
+    color:rgba(var(--secondary), 0.5);
+  }
+  .probe ul{ margin:0; padding:0; list-style:none; }
+  .probe li{
+    position:relative;
+    padding-left:12px;
+    font-size:12px;
+    line-height:1.6;
+    color:rgba(var(--secondary), 0.8);
+  }
+  .probe li + li{ margin-top:5px; }
+  .probe li::before{
+    content:"";
+    position:absolute;
+    left:0;
+    top:7px;
+    width:4px;
+    height:4px;
+    border-radius:50%;
+    background:rgba(var(--secondary), 0.35);
+  }
+
+  /* ---------- entrance motion ---------- */
+  [data-anim]{
+    opacity:0;
+    will-change:opacity,transform,filter;
+    transition-property:opacity,transform,filter;
+    transition-duration:560ms;
+    transition-timing-function:var(--ease);
+  }
+  [data-anim="up"]{ transform:translateY(28px); filter:blur(10px); }
+  [data-anim].is-in{ opacity:1; transform:none; filter:blur(0); }
+
+  @media (prefers-reduced-motion: reduce){
+    [data-anim]{ opacity:1 !important; transform:none !important; filter:none !important; transition:none !important; }
+    .thumb img{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<section class="section">
+  <div class="container">
+
+    <h2 class="heading" data-anim="up" style="transition-duration:600ms;transition-delay:60ms;">
+      VC异常排查方式
+    </h2>
+
+    <div class="grid" id="grid"></div>
+
+  </div>
+</section>
+
+<!-- 图片放大查看（渲染在浏览器顶层，不会被卡片边框裁掉）；必须放在脚本之前 -->
+<dialog class="zoomer" id="zoomer" aria-label="图片放大查看">
+  <button class="zoomer-close" type="button" aria-label="关闭">×</button>
+  <img alt="" />
+</dialog>
+
+<script>
+  // 数据来源：《01VC异常排查可视化梳理》
+  //   theme          ← 异常主题
+  //   formImage      ← 表现形式（图片链接）
+  //   interpretation ← 异常解读
+  //   manifestation  ← 体现形式
+  //   checkLabel/checks + solveLabel/solves ← 解决思路
+  const CHECK_ALL = [
+    "SOM 推送",
+    "全渠道链接核对",
+    "BI-渠道价格与7天订单均价明细表",
+    "bizrate.com",
+    "CNET Shopping 插件",
+    "Google 查找图片 / 标题",
+    "销售前台查看"
+  ];
+
+  const cards = [
+    {
+      theme: "DF 抑制",
+      formImage: "https://www.zupimages.net/up/26/41/11k3.jpg",
+      interpretation: "AMZ DF 利润不达标，导致 DF offer 被抑制（FBV 仍可售）",
+      manifestation: "FBV 有可用库存、DF 上架也有可用库存，后台 Direct Fulfillment Inventory 页面提示 Suppressed。",
+      checkLabel: "排查问题",
+      checks: [
+        "是否多仓布局 ≥3：短期不满足 3 仓可临时增加 DDP 接单；长期不满足 3 仓，考虑降低报价",
+        "近期是否低价售卖：恢复售价",
+        "报价是否贴 Amazon 底线：调整报价 / 优化合作模式占比",
+        "是否新品 / 是否 SC 转 VC？"
+      ],
+      solveLabel: "解决方案",
+      solves: [ "①VM 处理，加入 safelist" ]
+    },
+    {
+      theme: "Andon Cord",
+      formImage: "https://www.zupimages.net/up/26/41/xze0.jpg",
+      interpretation: "短期内退换货率 / 客诉多，导致 ASIN 在 VC 销售权限被抑制，并要求 vendor 回复 POA",
+      manifestation: "1. Andon 邮件；2. 销售发现前台 offer 不可售；3. 后台 Concession Hub 显示 Andon cord。",
+      checkLabel: "排查问题",
+      checks: [
+        "开 Case 确认是否 Andon cord",
+        "客服部门宇婷提交资料审核",
+        "客服转交资料给 VS Andon team 审核恢复"
+      ],
+      solveLabel: "解决方案",
+      solves: [
+        "①短期：提交 POA / 优化包装质量 / 保证图文准确性",
+        "②长期：新品严格管控质量（退换货率 >7% 的品类慎重上 VC）"
+      ]
+    },
+    {
+      theme: "广告抑制",
+      formImage: "https://www.zupimages.net/up/26/41/ai1j.jpg",
+      interpretation: "AMZ 利润不足，导致广告无法正常投放，营销权限被限",
+      manifestation: "后台广告状态：广告无法投放。",
+      checkLabel: "排查问题",
+      checks: [
+        "刷新过去 13 周利润",
+        "判断 CM 是否满足 Amazon 基准值"
+      ],
+      solveLabel: "解决方案",
+      solves: [
+        "①短期：找 VM 加白名单 safelist / 补 funding",
+        "②长期：解决 Amazon 利润问题；提升 CM 至基准线 / 解决 FBV 压货 / 优化退换货率"
+      ]
+    },
+    {
+      theme: "比价-多渠道",
+      formImage: "https://www.zupimages.net/up/26/41/c5t5.jpg",
+      interpretation: "前台价 ≠ RRP，同款不同平台比价",
+      manifestation: "价格异常低或异常高（与 RRP 不一致）。",
+      checkLabel: "排查方式",
+      checks: CHECK_ALL,
+      solveLabel: "解决方案",
+      solves: [
+        "①短期：商城拉价 / 上架同款 / 签稳价协议",
+        "②长期：IT 系统提高比价平台抓取成功率 / 长期渠道价格协同"
+      ]
+    },
+    {
+      theme: "比价-错误",
+      formImage: "https://www.zupimages.net/up/26/41/1i8b.jpg",
+      interpretation: "比价到非我司相似款，图文高度相似致错抓",
+      manifestation: "",
+      checkLabel: "排查方式",
+      checks: CHECK_ALL,
+      solveLabel: "解决方案",
+      solves: [
+        "①短期：图文优化 / 联系 VM",
+        "②长期：标题 + 图片差异化（综合单内协调）/ 减少同款不同色价差"
+      ]
+    },
+    {
+      theme: "比价-Independent Pricing",
+      formImage: "https://www.zupimages.net/up/26/41/0f5v.png",
+      interpretation: "无比价链接，前台异常高价",
+      manifestation: "",
+      checkLabel: "排查方式",
+      checks: CHECK_ALL,
+      solveLabel: "解决方案",
+      solves: [
+        "①VM 确认（亚马逊基于市场和利润情况自行调价，通常价差较小，暂时没有解决办法）"
+      ]
+    },
+    {
+      theme: "比价-Amazon Markdown（自动折扣）",
+      formImage: "https://www.zupimages.net/up/26/41/sqx9.jpg",
+      interpretation: "AMZ 自动折扣，为了清理 FBV 库存",
+      manifestation: "关注 FBV 库存。",
+      checkLabel: "排查方式",
+      checks: CHECK_ALL,
+      solveLabel: "解决方案",
+      solves: [ "①关注 FBV 库存" ]
+    },
+    {
+      theme: "其他常见异常",
+      formImage: "",
+      interpretation: [
+        "1. Compliance 限制：缺少合规性文件导致",
+        "2. Offer EOL：后台 offer 曾经被 VM 设置过 EOL（彻底淘汰）",
+        "3. AMZ 下单限制：DI / DDP 模式下 AMZ 限制下单或停止下单，多发于 FBV 库存积压或长期低价的型号",
+        "4. Amazon 无 RRP：AMZ 系统没有该产品的 RRP 信息",
+        "5. 促销期价格未恢复：促销活动已结束但前台价格未回调至 RRP"
+      ],
+      manifestation: "SOM 推送 / 后台状态 / Case 等等。",
+      checkLabel: "",
+      checks: [],
+      solveLabel: "解决方案（AMZ 下单限制）",
+      solves: [
+        "①短期：bulkbuy 或促销 funding 弥补 AMZ 亏损",
+        "②长期：原始定价满足 AMZ 要求 / 合作模式多样化"
+      ]
+    }
+  ];
+
+  const grid = document.getElementById('grid');
+
+  function esc(s){
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function thumbHtml(c){
+    const url = (c.formImage || '').trim();
+    const isFeishu = /feishu\.cn|feishu\.cn\/file|larksuite/i.test(url);
+    if (url && !isFeishu) {
+      return '<div class="thumb">' +
+               '<img alt="' + esc(c.theme) + ' 表现形式" src="' + url + '" ' +
+                    'onerror="var p=this.parentNode;p.classList.add(\'is-empty\');p.innerHTML=\'<span class=&quot;ph-title&quot;>表现形式图片</span><span class=&quot;ph-note&quot;>链接无法加载</span>\';" />' +
+             '</div>';
+    }
+    const note = isFeishu ? '飞书文件链接，需登录后查看' : '待填入线上图片链接';
+    return '<div class="thumb is-empty">' +
+             '<span class="ph-title">表现形式图片</span>' +
+             '<span class="ph-note">' + note + '</span>' +
+           '</div>';
+  }
+
+  function sectionHtml(label, items){
+    if (!items || !items.length) return '';
+    const lis = items.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('');
+    const head = label
+      ? '<div class="probe-h">' + (/^排查/.test(label) ? '🛠️ ' : '') + esc(label) + '</div>'
+      : '';
+    return '<div class="probe-sec">' + head + '<ul>' + lis + '</ul>' + '</div>';
+  }
+
+  cards.forEach(function (c, index) {
+    const article = document.createElement('article');
+    article.className = 'card';
+    article.setAttribute('data-anim', 'up');
+    article.style.transitionDuration = '520ms';
+    article.style.transitionDelay = (0.08 * index) + 's';
+
+    const isList = Array.isArray(c.interpretation);
+    const interp = isList
+      ? c.interpretation.map(esc).join('<br>')
+      : esc(c.interpretation);
+    const manifest = c.manifestation ? esc(c.manifestation) : '';
+
+    // 异常解读 + 体现形式 → 合并为一个浅蓝底板块
+    const detail =
+      '<div class="detail">' +
+        '<p class="detail-line' + (isList ? ' is-list' : '') + '">' +
+          '<span class="detail-label">✅ 异常解读</span>' +
+          '<span class="detail-text">' + interp + '</span>' +
+        '</p>' +
+        (manifest
+          ? '<p class="detail-line">' +
+              '<span class="detail-label">✅ 体现形式</span>' +
+              '<span class="detail-text">' + manifest + '</span>' +
+            '</p>'
+          : '') +
+      '</div>';
+
+    article.innerHTML =
+      thumbHtml(c) +
+      '<div class="body">' +
+        '<h3 class="theme">' + esc(c.theme) + '</h3>' +
+        detail +
+        '<div class="probe-label">解决思路</div>' +
+        '<div class="probe">' +
+          sectionHtml(c.checkLabel, c.checks) +
+          sectionHtml(c.solveLabel, c.solves) +
+        '</div>' +
+      '</div>';
+
+    grid.appendChild(article);
+  });
+
+  const observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-in');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
+
+  document.querySelectorAll('[data-anim]').forEach(function (el) { observer.observe(el); });
+
+  // ---- 固定排版：以 DF 抑制（第一张卡）的完整内容高度为基准，统一所有卡片与各字段的位置 ----
+  function lockLayout(){
+    const all = Array.prototype.slice.call(document.querySelectorAll('.card'));
+    if (!all.length) return;
+
+    // 1) 清除上一次约束
+    all.forEach(function (c) { c.style.minHeight = ''; });
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.theme, .detail, .probe-label'),
+      function (el) { el.style.minHeight = ''; }
+    );
+
+    // 2) 各行板块（主题 / 异常解读+体现形式 / 解决思路标题）跨卡片等高 → 下方内容起点固定
+    ['theme', 'detail', 'probe-label'].forEach(function (cls) {
+      const els = Array.prototype.slice.call(document.querySelectorAll('.' + cls));
+      let max = 0;
+      els.forEach(function (el) { max = Math.max(max, el.getBoundingClientRect().height); });
+      els.forEach(function (el) { el.style.minHeight = Math.ceil(max) + 'px'; });
+    });
+
+    // 3) 卡片整体高度统一（取最高的那张，即 DF 抑制的完整内容高度）
+    let maxCard = 0;
+    all.forEach(function (c) { maxCard = Math.max(maxCard, c.getBoundingClientRect().height); });
+    all.forEach(function (c) { c.style.minHeight = Math.ceil(maxCard) + 'px'; });
+  }
+
+  lockLayout();
+  requestAnimationFrame(lockLayout);
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(lockLayout); }
+  window.addEventListener('load', lockLayout);
+  let rzTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(lockLayout, 120);
+  });
+
+  // ---- 点击表现形式图片 → 放大查看（dialog 渲染在浏览器顶层，不受卡片边框/裁切影响） ----
+  const zoomer = document.getElementById('zoomer');
+  const zoomerImg = zoomer ? zoomer.querySelector('img') : null;
+
+  function openZoomer(src, alt) {
+    if (!zoomer || !zoomerImg) return;
+    zoomerImg.src = src;
+    zoomerImg.alt = alt || '';
+    if (typeof zoomer.showModal === 'function') {
+      if (!zoomer.open) { zoomer.showModal(); }
+    } else {
+      zoomer.setAttribute('open', '');
+    }
+  }
+  function closeZoomer() {
+    if (!zoomer || !zoomerImg) return;
+    if (typeof zoomer.close === 'function' && zoomer.open) { zoomer.close(); }
+    zoomer.removeAttribute('open');
+    zoomerImg.removeAttribute('src');
+  }
+
+  grid.addEventListener('click', function (e) {
+    const img = e.target && e.target.closest ? e.target.closest('.thumb img') : null;
+    if (!img) return;
+    e.preventDefault();
+    openZoomer(img.currentSrc || img.src, img.alt);
+  });
+
+  if (zoomer) {
+    zoomer.addEventListener('click', function (e) {
+      const t = e.target;
+      if (t === zoomer || (t && t.classList && t.classList.contains('zoomer-close'))) {
+        closeZoomer();
+      }
+    });
+    zoomer.addEventListener('cancel', function () { closeZoomer(); });
+    zoomer.addEventListener('close', function () {
+      if (zoomerImg) { zoomerImg.removeAttribute('src'); }
+    });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeZoomer(); }
+  });
+</script>
+
+</body>
+</html>

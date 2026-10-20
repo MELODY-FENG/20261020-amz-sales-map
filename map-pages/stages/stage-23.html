@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F2F4F3">
+<title>阶段板块 · 上架与合并流程图（7 条独立流程 · 21 个节点 · 悬停高亮）</title>
+<style>
+/* =========================================================
+   阶段板块 · 页面分区（含流程图）
+   左：流程图大卡（矢量 SVG · 点击放大全屏）
+   右：三等份色块（与背景分割 · 立体感）
+   ========================================================= */
+:root{
+  --deepblue:#1A3A5C;
+  --sky:#1E90FF;
+  --sub-gray:#555555;
+  --ink:#26343F;
+  --line:#6B7580;
+  --line-edge:rgba(61,84,103,.12);
+  --flat-2:#E9EFF4;
+  --flat-3:#F5EFE8;
+  --gap-panes:3mm;
+  --r-block:18px;--r-card:22px;
+  --font-cn:"PingFang SC","Microsoft YaHei","Noto Sans SC","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--font-cn);color:var(--ink);min-height:100dvh;
+  background:
+    radial-gradient(900px 640px at 5% -6%, rgba(207,232,225,.86) 0%, rgba(207,232,225,0) 68%),
+    radial-gradient(980px 720px at 103% 5%, rgba(246,211,190,.88) 0%, rgba(246,211,190,0) 66%),
+    radial-gradient(1060px 800px at 50% 118%, rgba(212,226,242,.80) 0%, rgba(212,226,242,0) 64%),
+    linear-gradient(118deg,#EAF3F1 0%,#F5F6F6 48%,#FAEFE9 100%);
+  background-attachment:fixed;
+}
+.page{
+  width:min(1500px,100%);margin:0 auto;height:100dvh;overflow:hidden;
+  border-left:1px solid var(--line-edge);border-right:1px solid var(--line-edge);
+  padding:clamp(18px,2.2vw,38px) clamp(16px,2.4vw,52px);
+  display:flex;flex-direction:column;
+}
+.title{
+  color:var(--deepblue);font-weight:800;text-align:center;
+  font-size:clamp(24px,2.6vw,35px);letter-spacing:.02em;line-height:1.16;
+  margin-top:-5mm;padding-bottom:clamp(14px,2vw,30px);
+}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);align-items:stretch}
+.pane-left{position:relative;z-index:5;display:flex;padding-right:0;min-width:0;min-height:0}
+.left-card{
+  flex:1;min-width:0;min-height:160px;display:flex;flex-direction:column;gap:8px;
+  background:transparent;border:0;box-shadow:none;padding:14px 0 4mm 14px;
+}
+.flow-tag,.blk-sub{
+  display:inline-flex;align-items:center;gap:7px;align-self:flex-start;
+  background:rgba(120,132,146,.14);color:#5A6472;
+  font-size:12px;font-weight:800;letter-spacing:.08em;line-height:1;
+  padding:6px 11px;border-radius:8px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.flow-tag{text-decoration:none;cursor:pointer;transition:background .15s ease,box-shadow .15s ease}
+.flow-tag .ft-sep{color:rgba(90,100,114,.45);font-weight:600;letter-spacing:0}
+.flow-tag:hover{background:rgba(120,132,146,.24);box-shadow:0 3px 10px rgba(74,103,124,.16)}
+.flow-tag:hover .ft-act{text-decoration:underline;text-underline-offset:2px}
+.flow-tag:focus-visible{outline:2px solid #2C7FB6;outline-offset:2px}
+
+/* 流程图大卡：完整呈现（不滚动）+ 点击放大 */
+/* 标签行：流程图胶囊 + 正方形放大按钮（同一水平线、同一灰色玻璃质感） */
+.tag-row{display:flex;align-items:center;gap:8px}
+.zoom-btn{
+  width:26px;height:26px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  padding:0;border:0;border-radius:8px;cursor:pointer;
+  background:rgba(120,132,146,.14);color:#5A6472;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  transition:background .15s ease,box-shadow .15s ease,transform .15s ease;
+}
+.zoom-btn:hover{background:rgba(120,132,146,.26);box-shadow:0 3px 10px rgba(74,103,124,.16);transform:scale(1.06)}
+.zoom-btn:active{transform:scale(.97)}
+.zoom-btn:focus-visible{outline:2px solid #2C7FB6;outline-offset:2px}
+.zoom-btn svg{display:block}
+
+/* ---------- 流程图（矩阵网格版） ---------- */
+.flow-wrap{flex:1;min-height:0;position:relative;overflow:hidden;padding:0}
+.mx{position:absolute;inset:0;width:100%;height:100%;min-height:0;overflow:hidden;display:grid;
+  grid-template-columns:58px repeat(4,minmax(0,1fr));grid-template-rows:26px;grid-auto-rows:minmax(0,84px);gap:6px 14px}
+.mx-tpl{display:none}
+.mx-h{display:flex;align-items:flex-end;justify-content:center;font-size:11.5px;font-weight:800;color:#41525F;letter-spacing:.06em;padding-bottom:3px}
+.mx-h0{justify-content:center}
+.mx-badge{display:flex;align-items:center;justify-content:center}
+.mx-badge span{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;border:1px solid rgba(0,0,0,.06)}
+/* ---------- 色块：形状 / 描边 ---------- */
+.mx-cell{position:relative;min-height:0;display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:12px;
+      --fill:linear-gradient(160deg,#FFFFFF 0%,#FFFFFF 100%);   /* 填充色原样保留（不随高光改变） */
+      background-image:
+        linear-gradient(45deg,rgba(255,255,255,0) 36%,rgba(150,192,238,.55) 45%,rgba(255,255,255,.98) 50%,rgba(150,192,238,.50) 55%,rgba(255,255,255,0) 64%),
+        var(--fill);
+      background-repeat:no-repeat,no-repeat;
+      background-size:300% 300%,100% 100%;
+      background-position:130% 130%,0 0;
+      border:1px solid rgba(15,23,42,.05);overflow:visible;
+      transition:transform .2s ease,box-shadow .2s ease}
+/* 子流程首个色块：固定浅蓝渐变 */
+.mx-cell.first{--fill:linear-gradient(160deg,#E7F1FE 0%,#CFE2FB 100%);border-color:rgba(37,99,235,.14)}
+/* 子流程尾个色块：沿用原 RPA 卡片的浅灰蓝渐变 */
+.mx-cell.tail{--fill:linear-gradient(160deg,#FFFFFF 0%,#FFFFFF 100%);border-color:rgba(15,23,42,.05)}
+/* 「本阶段结束」：浅红 */
+.mx-cell.end{--fill:linear-gradient(160deg,#FEE2E2 0%,#FEE2E2 100%);border-color:rgba(239,68,68,.18)}
+/* 其余色块统一纯白（带链接也一样，只靠右下角外链角标区分） */
+.mx-cell.empty{--fill:transparent;background-image:none;border-color:transparent}
+.mx-cell.br-sub{--fill:linear-gradient(160deg,#F2F7FE 0%,#F2F7FE 100%);border-color:rgba(37,99,235,.10)}
+.c-row{display:flex;align-items:flex-start;gap:7px;min-height:0}
+.c-ic{width:14px;height:14px;flex:none;margin-top:1px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.c-type{display:none}
+.c-main{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+    .c-badge{align-self:flex-start;display:inline-flex;align-items:center;white-space:nowrap;
+      font-size:8.5px;line-height:1.5;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+      color:#5A6472;background:rgba(255,255,255,.72);border:1px solid rgba(15,23,42,.08);
+      border-radius:999px;padding:0 6px}
+    .c-foot{display:flex;align-items:center;gap:4px;margin-top:auto;padding-top:2px;
+      font-size:9px;font-weight:600;color:#96A2B0;letter-spacing:.02em;white-space:nowrap}
+    .c-foot svg{width:10px;height:10px;flex:none}
+    .mx-cell:hover .c-foot{color:#5A6472}
+    .c-t{margin:0;min-height:0;font-size:10.5px;line-height:1.24;font-weight:600;color:#1F2937;
+  text-align:left;word-break:break-word}
+.hl{color:#D97706;font-weight:800}
+.c-link{display:flex;flex-direction:column;flex:1;min-height:0;gap:3px;text-decoration:none;color:inherit}
+.c-linkic{position:absolute;right:7px;bottom:6px;width:11px;height:11px;color:#9AA6B6;display:inline-flex}
+.c-linkic svg{width:11px;height:11px}
+/* 行内连接：细线 + 箭头（居中对齐，落在两个色块之间） */
+    .mx-cell.has-next::before{content:'';position:absolute;right:-13px;top:50%;width:12px;height:8px;margin-top:-4px;z-index:6;
+      background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='12'%20height='8'%3E%3Cpath%20d='M0.6%204h9'%20stroke='%23B6C0CC'%20stroke-width='1.4'%20stroke-linecap='round'/%3E%3Cpath%20d='M8.4%201.5%2011.2%204l-2.8%202.5'%20fill='none'%20stroke='%23B6C0CC'%20stroke-width='1.4'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain}
+
+    /* 悬停高光扫过：280ms / ease-out / 45° / 属性 background-position（只移动高光层，填充色不变） */
+    .mx-cell:hover{animation:shineSweep 280ms ease-out}
+    @keyframes shineSweep{from{background-position:130% 130%,0 0}to{background-position:-30% -30%,0 0}}
+.mx-badge span{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;border:1px solid rgba(0,0,0,.06)}
+.mx-badge .sb{background:#FEF3C7;color:#92400E;border-color:#FDE68A}
+/* 悬停：单块放大 */
+.mx-cell:hover{transform:scale(1.12);z-index:9;box-shadow:0 10px 22px rgba(51,65,85,.20)}
+/* 悬停：该条流程全部色块外框动态渐变红 */
+.mx-cell.hot::after{content:'';position:absolute;inset:0;border-radius:inherit;padding:2px;pointer-events:none;
+  background:linear-gradient(90deg,#FF2D2D,#FF8A3D,#E01B4C,#FF2D2D);background-size:300% 100%;
+  animation:hotflow 2.2s linear infinite;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+@keyframes hotflow{0%{background-position:0 0}100%{background-position:300% 0}}
+.fl-ov-body{position:relative}
+.fl-ov-body .mx{position:absolute;inset:0;height:100%;width:100%}
+.fl-zoom{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:zoom-in}
+.flow-svg{width:100%;height:100%;display:block}
+.flow-svg a{cursor:pointer}
+/* 鼠标滑过单个色块 → 该色块放大（并抬到最上层，见页面脚本） */
+.flow-svg .nd{transform-box:fill-box;transform-origin:50% 50%;transition:transform .2s ease}
+.flow-svg .nd:hover{transform:scale(1.1)}
+.flow-svg .nd rect.card{transition:stroke-width .2s ease}
+/* 鼠标划到某条子流程的任意色块 → 该条流程“全部色块”的外框变成动态渐变红 */
+.flow-svg .nd.hot rect.card{stroke:url(#gRed);stroke-width:2.6}
+
+.pane-right{
+  min-width:0;min-height:0;padding:14px 0 4mm 0;margin-left:var(--gap-panes);
+  display:grid;grid-template-rows:auto minmax(0,1fr);gap:0;
+}
+.blk{display:flex;flex-direction:column;gap:8px;min-height:0}
+/* ❓销售做什么 & ❓向谁要什么：并排一行、等高、各自收窄 */
+/* 鼠标滑过 → 单个条目（如“拉通 SOP”）自动放大，不放大整块 */
+.list-item{position:relative;transition:transform .2s ease,box-shadow .2s ease;transform-origin:50% 50%}
+.list-item:hover{transform:scale(1.06);z-index:4;box-shadow:0 6px 16px rgba(0,0,0,.10)}
+
+.blk-row{
+  min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);
+  gap:0;margin-top:clamp(6px,0.6vw,9px);
+}
+.blk-body{
+  flex:1;border-radius:var(--r-block);min-height:36px;
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:
+    0 14px 28px rgba(74,103,124,.20),
+    0 3px 8px rgba(74,103,124,.12),
+    inset 0 1.5px 0 rgba(255,255,255,.65),
+    inset 0 -4px 10px rgba(74,103,124,.12);
+}
+.blk-1 .blk-body{background:var(--sky);display:flex;align-items:stretch;min-height:30px}
+/* ---------- 左上角：阶段板块识别（序号 + 阶段 + 环节名称） ---------- */
+.page{position:relative}
+.stage-id{display:inline-flex;align-items:center;gap:12px;width:fit-content;padding:0;background:none;border:0;box-shadow:none}
+.stage-id .si-num{width:36px;height:36px;flex:none;border-radius:50%;background:var(--deepblue);color:#FFFFFF;
+  display:inline-flex;align-items:center;justify-content:center;font-size:17px;line-height:1;font-weight:800;letter-spacing:.01em}
+.stage-id .si-title{display:inline-flex;align-items:center;gap:14px;background:var(--deepblue);color:#FFFFFF;
+  padding:6px 18px;border-radius:10px}
+.stage-id .si-stage,.stage-id .si-name{background:none;padding:0;color:#FFFFFF;
+  font-size:20px;line-height:1.15;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.stage-id .si-sep{width:1px;height:22px;flex:none;background:rgba(255,255,255,.5)}
+.stage-id .si-name{color:#E07B2F}
+/* ---------- 页头：左上角放阶段识别（原「阶段板块」标题已删除） ---------- */
+.page-head{flex:none;display:flex;align-items:center;gap:20px;padding-bottom:clamp(10px,1.4vw,18px)}
+/* ---------- 业务推进链路（Stepper：24px 圆形序号 + 分隔条 + 标题，可点击切换） ---------- */
+.chain-card{flex:1;min-width:0;display:flex;align-items:center;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+.st-nav{display:flex;width:100%;align-items:center;min-width:0}
+.st-item{display:flex;align-items:center;justify-content:center;flex:1 1 auto;min-width:0}
+.st-trigger{display:inline-flex;flex-direction:row;align-items:center;gap:10px;padding:0;border:0;background:transparent;
+  border-radius:9999px;cursor:pointer;outline:none;min-width:0}
+.st-trigger:focus-visible{box-shadow:0 0 0 3px rgba(26,58,92,.22)}
+.st-ind{position:relative;overflow:hidden;width:24px;height:24px;flex:none;border-radius:9999px;background:#FFFFFF;color:#3F3F46;
+  border:1px solid #E4E4E7;display:inline-flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;transition:background-color .25s ease,color .25s ease}
+.st-item[data-state=active] .st-ind,.st-item[data-state=completed] .st-ind{background:var(--deepblue);color:#fff}
+.st-ind svg{display:block;width:13px;height:13px;max-width:13px;max-height:13px}
+.st-title{display:inline-block;transform-origin:left center;transition:transform .18s ease;font-size:14px;font-weight:600;line-height:1;color:#71717A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-trigger:hover .st-title{transform:scale(1.1)}
+.st-item[data-state=active] .st-title{color:#18181B;font-weight:600}
+.st-item[data-state=completed] .st-title{color:#3F3F46}
+.st-sep{margin:0 10px;height:2px;min-width:18px;flex:1 1 auto;border-radius:9999px;background:#E4E4E7}
+.st-item[data-state=completed] + .st-sep{background:var(--deepblue)}
+@media (max-width:1100px){
+  .page-head{flex-direction:column;align-items:flex-start;gap:10px}
+  .stepper-card{width:100%}
+  .st-title{font-size:11px}
+}
+@media (max-width:1100px){
+  .page-head{flex-direction:column;align-items:flex-start;gap:10px}
+  .stepper{flex-wrap:wrap;row-gap:8px}
+  .st-sep{min-width:12px}
+}
+
+/* ---------- 公告横幅（Banner_centred 组件还原） ----------
+   bg-indigo-600 #4F46E5 ／ px-4 py-3 ／ text-white ／ 居中
+   Learn more → 固定名「销售动作」+ 右箭头（w-5 h-5） */
+.blk-1 .blk-body.banner{background:transparent;display:block;min-height:0;border-radius:0;border:0;box-shadow:none}  /* 外框方形 */
+.banner-stack{display:flex;flex-direction:column;gap:10px}
+.banner-row{display:flex;align-items:stretch;border-radius:0;overflow:hidden;
+  box-shadow:0 12px 26px rgba(74,103,124,.18),0 2px 6px rgba(74,103,124,.10)}
+/* 左侧：固定名「销售动作」——实色底打底，28px */
+.banner-label{flex:none;display:flex;align-items:center;gap:9px;padding:11px 18px;
+  background:#4F46E5;color:#fff;font-size:18px;line-height:1.2;font-weight:800;letter-spacing:.01em;
+  white-space:nowrap;text-decoration:none}          /* 销售动作下面不要有横线 */
+.banner-label:hover{color:#E0E7FF}
+.banner-label .bl-ic{width:24px;height:24px;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.banner-label .bl-ic svg{width:22px;height:22px;display:block}
+.banner-label .bl-arrow{width:18px;height:18px;flex:none}
+/* 右侧：字段内容——当前底色的浅色渐变压底，16px */
+.banner-content{flex:1;min-width:0;display:flex;align-items:center;padding:11px 18px;
+  background:linear-gradient(90deg,#EDEFFF 0%,#DFE3FC 55%,#F2F3FF 100%);
+  color:#3F3D9B;font-size:12px;line-height:1.5;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- 旧的蓝底色块样式（已停用，保留不影响） ---------- */
+.media-card{padding:0;overflow:hidden;display:flex;flex-direction:column;background:#FFFFFF}
+.media-body{flex:1;min-height:0;padding:12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;background:#FFFFFF}
+.act-item{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #E4E4E7;border-radius:6px;
+  background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.act-dot{width:8px;height:8px;border-radius:50%;background:#6366F1;flex:none}
+.act-item p{margin:0;flex:1;min-width:0;font-size:14px;font-weight:500;color:#18181B;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.media-foot{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;
+  border-top:1px solid #F1F1F3;background:#FAFAFB}
+.mf-ic{width:18px;height:18px;border-radius:5px;background:#18181B;color:#fff;flex:none;
+  display:inline-flex;align-items:center;justify-content:center}
+.mf-name{font-size:13px;font-weight:600;color:#3F3F46}
+.mf-meta{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#71717A}
+.media-body::-webkit-scrollbar{width:8px}
+.media-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+.seg-i{flex:1;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:600;font-size:13.5px;letter-spacing:.02em}
+.seg-line{width:1px;align-self:center;height:56%;background:rgba(255,255,255,.9)}
+.blk-2 .blk-body{background:var(--flat-2)}
+.blk-3 .blk-body{background:var(--flat-3)}
+
+/* ---------- 右下两个色块：列表卡设计样式（shadcn List 组件还原） ---------- */
+.blk-2 .list-body,.blk-3 .list-body{background:#F4F4F5}
+
+/* ---------- ❓销售做什么 & ❓向谁要什么：融入同一色块（内部设计不变） ---------- */
+.blk-merged .blk-body{background:#F4F4F5;display:flex;flex-direction:column}
+.merge-cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:clamp(8px,1vw,14px)}
+.merge-col{min-width:0;min-height:0;display:flex;flex-direction:column}
+/* 默认最多展示 6 条，超出部分折叠，可一键展开/收起 */
+.list-item.is-folded{display:flex}
+.more-toggle{align-self:center;margin-top:2px;font-size:11px;line-height:1.2;font-weight:600;color:#64748B;
+  background:#F1F5F9;border:1px solid #E2E8F0;border-radius:8px;padding:3px 10px;cursor:pointer;
+  font-family:inherit;white-space:nowrap}
+.more-toggle:hover{background:#E9EEF5;color:#475569}
+.list-body{padding:0;overflow:hidden;display:flex;flex-direction:column}
+/* 表头：bg-foreground/5 + p-3 + 8px 圆点 + text-sm font-semibold */
+.list-head{flex:none;display:flex;align-items:center;gap:8px;padding:12px;background:rgba(0,0,0,.05)}
+.li-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.list-head p{margin:0;font-size:14px;font-weight:600;line-height:1.2;color:#18181B}
+/* 列表容器：bg-secondary */
+.list-group{flex:1;min-height:0;display:flex;background:#F4F4F5}
+/* ListItems：flex col + gap-2 + p-3 */
+.list-items{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:12px;overflow-y:auto}
+/* ListItem：rounded-md + border + bg-background + p-2 + shadow-sm */
+.list-item{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #E4E4E7;border-radius:6px;
+  background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:grab}
+.list-item:active{cursor:grabbing}
+.list-item p{margin:0;flex:1;min-width:0;font-size:14px;font-weight:500;color:#18181B;
+  white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:2;text-overflow:ellipsis}
+.li-val{flex:none;font-size:12px;color:#71717A;white-space:nowrap}
+.li-ic{flex:none;display:inline-flex;color:#71717A}
+.list-items::-webkit-scrollbar{width:8px}
+.list-items::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px}
+.list-items::-webkit-scrollbar-track{background:transparent}
+
+/* 流程图全屏放大（原交互：× / 点遮罩 / Esc 关闭） */
+.fl-ov{position:fixed;inset:0;z-index:80;background:rgba(28,44,58,.38);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none}
+.fl-ov.show{display:flex}
+.fl-ov-card{flex:1;min-width:0;display:flex;flex-direction:column;
+  background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(255,255,255,.92));
+  padding:16px clamp(16px,3vw,44px) 20px}
+.fl-ov-head{display:flex;align-items:center;gap:12px;padding-bottom:8px}
+.fl-ov-head b{font-size:16px;font-weight:800;color:var(--ink);letter-spacing:.06em;white-space:nowrap}
+.fl-ov-head span{font-size:12px;color:#5B6A76;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fl-close{margin-left:auto;flex:none;width:36px;height:36px;border-radius:50%;
+  border:1px solid #C4D2DC;background:#fff;color:#41525F;font-size:20px;line-height:1;cursor:pointer}
+.fl-close:hover{background:#F2F6F9}
+.fl-ov-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto}
+.fl-ov-svg{display:block;width:min(100%,calc((100dvh - 132px)*0.9186));height:auto;transition:transform .2s ease}
+/* 全屏放大后：鼠标悬停在流程板块上 → 整个板块放大 */
+.fl-ov-svg:hover{transform:scale(1.06)}
+.fl-ov.show .zoom-btn{display:none !important}
+
+@media (max-width:900px){
+  .page{height:auto;min-height:0;overflow:visible;padding-bottom:clamp(18px,3vw,32px)}
+  .split{display:flex;flex-direction:column;gap:clamp(14px,2.4vw,22px)}
+  .pane-left{padding-right:0}
+  .flow-wrap{height:clamp(320px,52vh,560px);flex:none}
+  .pane-right{margin-left:0;padding-left:0;padding-bottom:0;display:grid;grid-template-rows:none;gap:clamp(14px,2.4vw,22px)}
+  .blk-row{grid-template-columns:1fr;gap:clamp(14px,2.4vw,22px);margin-top:0}
+  .blk-body{min-height:clamp(96px,14vh,160px)}
+  .page{border-left:none;border-right:none}
+}
+
+/* ================= 说明 / 源码 抽屉（交付用，不影响看板设计） ================= */
+.doc-btn{position:fixed;right:18px;bottom:16px;z-index:120;padding:7px 14px;border-radius:999px;
+  border:1px solid rgba(15,23,42,.10);background:rgba(255,255,255,.94);color:#1A3A5C;
+  font:600 12px/1 var(--font-cn);cursor:pointer;box-shadow:0 8px 20px rgba(74,103,124,.18)}
+.doc-btn:hover{background:#fff;color:#E07B2F}
+.doc-ov{position:fixed;inset:0;z-index:130;background:rgba(28,44,58,.42);display:none}
+.doc-ov.show{display:flex}
+.doc-card{margin:auto;width:min(1180px,93vw);height:min(85vh,880px);display:flex;flex-direction:column;
+  background:linear-gradient(160deg,#FFFFFF,#F7F9FB);border-radius:20px;border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 30px 60px rgba(20,35,50,.28);overflow:hidden}
+.doc-head{flex:none;display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid rgba(15,23,42,.07)}
+.doc-head b{font-size:16px;font-weight:800;color:#1A3A5C;white-space:nowrap}
+.doc-tabs{display:flex;gap:6px;margin-left:10px;flex-wrap:wrap}
+.doc-tab{padding:6px 12px;border-radius:999px;border:1px solid rgba(15,23,42,.10);background:#fff;color:#5A6472;
+  font:600 12px/1 var(--font-cn);cursor:pointer}
+.doc-tab.is-on{background:#1A3A5C;color:#fff;border-color:#1A3A5C}
+.doc-close{margin-left:auto;width:34px;height:34px;border-radius:50%;border:1px solid #C4D2DC;background:#fff;
+  color:#41525F;font-size:18px;line-height:1;cursor:pointer}
+.doc-close:hover{background:#F2F6F9}
+.doc-body{flex:1;min-height:0;overflow:auto;padding:18px 22px 26px}
+.doc-pane{display:none}
+.doc-pane.is-on{display:block}
+.doc-pane h3{margin:16px 0 8px;font-size:14px;font-weight:800;color:#1A3A5C}
+.doc-pane h3:first-child{margin-top:0}
+.doc-pane p,.doc-pane li{font-size:12.5px;line-height:1.75;color:#41525F}
+.doc-pane ol,.doc-pane ul{margin:6px 0 6px 18px}
+.doc-pane code{background:#F1F4F7;border-radius:4px;padding:1px 5px;font-size:12px;color:#1F4A6E}
+.doc-pane table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:12.5px}
+.doc-pane th,.doc-pane td{border:1px solid #E4E9EE;padding:7px 10px;text-align:left;color:#41525F;vertical-align:top}
+.doc-pane th{background:#F4F7FA;color:#1A3A5C;font-weight:700;white-space:nowrap}
+.doc-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.doc-tools button{padding:6px 12px;border-radius:8px;border:1px solid rgba(15,23,42,.12);background:#fff;color:#1A3A5C;
+  font:600 12px/1 var(--font-cn);cursor:pointer}
+.doc-tools button:hover{background:#F4F7FA;color:#E07B2F}
+.doc-pre{margin:0;padding:14px;border-radius:12px;background:#0F2233;color:#D7E3EE;font:12px/1.65 Consolas,Monaco,monospace;
+  white-space:pre;overflow:auto;max-height:none}
+.doc-tip{font-size:11.5px;color:#8A97A4;margin-top:8px}
+/* ================= 流程图节点：椭圆胶囊样式 ================= */
+.ncscale{line-height:0}
+.ncnode{width:auto}
+.nccard{position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;height:34px;line-height:1.2;
+  padding:0 16px;border-radius:999px;background:#F4F5F6;border:1px solid #E6E9ED;box-shadow:none;
+  font-size:12.5px;font-weight:600;color:#1F2937;text-decoration:none;white-space:nowrap;backdrop-filter:none}
+.nclabel{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ncdot{width:7px;height:7px;flex:none;border-radius:50%;background:#22C55E}
+.ncbr{font-size:12px;line-height:1;color:#E07B2F;flex:none;transition:color .15s ease}
+.ncnode[data-branch]:active .ncbr{color:#22C55E}
+.ncnode[data-branch].is-open .ncbr{color:#22C55E}
+.nccard.is-branch{border-color:#E14B4B;border-width:1.5px;cursor:pointer;background:#FFF7F7}
+.ncnode[data-branch]:hover .nccard{background:#FFFFFF}
+.nccard.is-trunc .nclabel{max-width:100%}
+.nccard[data-link]{cursor:pointer}
+.ncnode:hover .nccard{background:#FFFFFF;box-shadow:0 8px 18px -6px rgba(15,23,42,.22)}
+.nccard .ncchip,.nccard .ncbadge,.nccard .nctitle,.nccard .ncfoot,.nccard .ncbtn{display:flex}
+/* ================= 流程图胶囊：加高 / 点入链接 /【】高亮 ================= */
+.nccard{height:80px;padding:0 22px;gap:10px}
+.nch{color:#E07B2F}
+.nclink{display:inline-flex;align-items:center;flex:none;color:#E07B2F;transition:color .15s ease}
+.nclink svg{display:block;width:13px;height:13px}
+.ncnode:active .nclink{color:#22C55E}
+.ncnode .nclink.is-clicked{color:#22C55E}
+/* ================= 胶囊内容自动换行、字号自适应 ================= */
+.nccard{width:168px;height:80px;box-sizing:border-box;white-space:normal;overflow:hidden;flex:0 0 168px}
+.nclabel{flex:1;min-width:0;white-space:normal;word-break:break-word;overflow:visible;text-overflow:clip;line-height:1.35}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+
+/* ---------- 分支按钮：灰色更小的胶囊，字号与正文一致 ---------- */
+.br-toggle{margin-top:auto;align-self:flex-start;font-size:10.5px;line-height:1.15;font-weight:600;color:#64748B;
+  background:#F1F5F9;border:1px solid #E2E8F0;border-radius:8px;padding:1px 8px;cursor:pointer;white-space:nowrap}
+.br-toggle:hover{background:#E9EEF5;color:#475569}
+/* 分支行的小胶囊 */
+.br-pills{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:2px}
+.br-pills span{font-size:9px;font-weight:600;color:#0369A1;background:#fff;border:1px solid #BAE6FD;
+  border-radius:999px;padding:2px 7px;white-space:nowrap}
+/* ---------- 结束行：与上方流程 +2mm 间隔；说明文字与结束块同号 ---------- */
+.mx-end{grid-column:1 / -1;display:flex;align-items:center;gap:12px;border-top:2px dashed rgba(15,23,42,.12);
+  padding:6px 0 0 66px;margin-top:8px}
+.mx-endnote{font-size:10.5px;font-weight:700;color:#41525F}
+.mx-spec{margin-left:auto;font-size:9px;font-weight:600;color:#8A97A4;letter-spacing:.02em;white-space:nowrap}
+.mx-flag{flex:none;display:inline-flex;align-items:center;justify-content:center}
+.mx-endtitle{font-size:14px;line-height:1;font-weight:800;color:#E07B2F;white-space:nowrap}
+/* ---------- 整块底板：浅玻璃面板 + 细描边 ---------- */
+.mx-panel{position:absolute;inset:0;padding:10px;border-radius:14px;
+  background:linear-gradient(160deg,rgba(255,255,255,.72),rgba(255,255,255,.46));
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 12px 30px rgba(74,103,124,.10),inset 0 1px 0 rgba(255,255,255,.9)}
+    .ncview{position:relative;flex:1;min-height:0;overflow:hidden;border-radius:12px;padding:0}
+    .ncview:hover,.ncv:hover{overflow:visible}
+.mx-panel .mx{position:relative;width:100%;height:100%}
+
+/* 列名下方虚线（与本阶段结束上方同款：2px 虚线） */
+/* 旧的列名虚线已随矩阵移除 */
+
+    /* =========================================================
+       节点卡片式流程图（复现 n8n Workflow Block 的节点卡片）
+       卡片：图标框 + 步骤副标题 + 主题 + → 点入链接
+       连线：三次贝塞尔虚线（8,6 / opacity .35）
+       ========================================================= */
+    .flow-wrap{flex:1;min-width:0;min-height:0;position:relative;overflow:visible;display:flex;flex-direction:column;gap:10px;padding:0}
+        .ncv{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;border-radius:18px;padding:3mm;
+      background:#F4F4F5;
+      border:1px solid rgba(255,255,255,.55);
+      box-shadow:0 14px 28px rgba(74,103,124,.20),0 3px 8px rgba(74,103,124,.12),inset 0 1.5px 0 rgba(255,255,255,.65),inset 0 -4px 10px rgba(74,103,124,.12)}
+    .ncstage{position:relative}
+    .ncsvg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
+    .ncnode{position:absolute;width:168px;cursor:grab;touch-action:none;will-change:transform}
+    .ncnode.dragging{cursor:grabbing;z-index:50}
+    .ncscale{transform-origin:0 0;transition:transform .2s ease}
+    .ncnode:hover{z-index:999}
+    .ncnode:hover .ncscale{transform:scale(1.5)}
+    .ncnode:hover .nccard{background:#FFFFFF}
+    .ncnode.dragging .ncscale{transform:scale(1.05)}
+    .nccard{position:relative;overflow:hidden;border-radius:12px;padding:8px 10px;font-size:11px;
+      border:1px solid rgba(15,23,42,.10);background:rgba(255,255,255,.88);
+      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:box-shadow .2s ease}
+    .ncnode:hover .nccard{box-shadow:0 10px 18px -6px rgba(15,23,42,.18)}
+    .ncnode.dragging .nccard{box-shadow:0 0 0 2px rgba(82,39,255,.45),0 16px 24px -6px rgba(15,23,42,.20)}
+    .nccard::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s ease;pointer-events:none;
+      background:linear-gradient(to bottom right,rgba(14,20,26,.05),rgba(14,20,26,0) 55%)}
+    .ncnode:hover .nccard::before{opacity:1}
+    .nccard::after{content:'';position:absolute;inset:0;opacity:0;pointer-events:none;
+      background:linear-gradient(45deg,rgba(255,255,255,0) 36%,rgba(150,192,238,.50) 45%,rgba(255,255,255,.95) 50%,rgba(150,192,238,.45) 55%,rgba(255,255,255,0) 64%);
+      background-repeat:no-repeat;background-size:300% 300%;background-position:130% 130%}
+    .ncnode:hover .nccard::after{opacity:1;animation:ncShine 280ms ease-out forwards}
+    @keyframes ncShine{from{background-position:130% 130%}to{background-position:-30% -30%}}
+    .ncrow{position:relative;display:flex;align-items:flex-start;gap:8px}
+    .ncchip{width:26px;height:26px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+      border-radius:8px;border:1px solid;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+    .ncchip svg{width:14px;height:14px}
+    .ncmain{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+    .ncbadge{align-self:flex-start;font-size:8.5px;line-height:1.5;font-weight:700;letter-spacing:.14em;color:#5A6472;
+      background:rgba(255,255,255,.8);border:1px solid rgba(15,23,42,.08);border-radius:999px;padding:0 6px;white-space:nowrap}
+    .nctitle{margin:0;font-size:1em;line-height:1.3;font-weight:600;color:#1F2937;word-break:break-word}
+    .ncfoot{position:relative;display:flex;align-items:center;gap:4px;margin-top:6px;font-size:9px;font-weight:800;
+      color:#96A2B0;letter-spacing:.02em;white-space:nowrap;text-decoration:none}
+    .ncfoot svg{width:10px;height:10px;flex:none}
+    a.ncfoot:hover{color:#3B82F6}
+    .ncnum{position:absolute;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:800;color:#41525F;background:rgba(255,255,255,.9);border:1px solid rgba(15,23,42,.08)}
+    .ncnum.hidden{display:flex}
+    .ncbtn{margin-top:6px;font-size:9px;line-height:1.2;font-weight:600;color:#64748B;background:#F1F5F9;
+      border:1px solid #E2E8F0;border-radius:8px;padding:1px 8px;cursor:pointer;white-space:nowrap;font-family:inherit}
+    .ncbtn:hover{background:#E9EEF5;color:#475569}
+    .nccard.static{cursor:default}
+    .mx-end{padding:0 0 0 2px;margin:0;border-top:0;display:flex;align-items:center;gap:12px}
+    .mx-endnote{font-size:10.5px;font-weight:700;color:#41525F}
+    </style>
+<style>.doc-btn,.doc-ov{display:none !important}</style></head>
+<body>
+
+
+<main class="page">
+
+  <div class="page-head">
+    <div class="stage-id" aria-label="阶段板块识别">
+      <span class="si-num">03</span><span class="si-title"><span class="si-stage">掌旗期</span><span class="si-sep" aria-hidden="true"></span><span class="si-name">CD立项</span></span>
+    </div>
+    <div class="chain-card" aria-label="业务推进链路">
+      <div class="st-nav" role="tablist">
+        <div class="st-item" data-state="completed" data-step="1"><button class="st-trigger" type="button" role="tab" aria-selected="false"><span class="st-ind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,13 10,18 19,7"/></svg></span><span class="st-title">销售监控前后台产品运营正常</span></button></div>
+        <div class="st-sep"></div>
+        <div class="st-item" data-state="completed" data-step="2"><button class="st-trigger" type="button" role="tab" aria-selected="false"><span class="st-ind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,13 10,18 19,7"/></svg></span><span class="st-title">销售组沟通异常</span></button></div>
+        <div class="st-sep"></div>
+        <div class="st-item" data-state="active" data-step="3"><button class="st-trigger" type="button" role="tab" aria-selected="true"><span class="st-ind">3</span><span class="st-title">联动VC组中台递出诉求（VC异常/跟卖等）</span></button></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="split">
+
+    <section class="pane-left" aria-label="上架与合并流程图：僵尸处理与三级分类合并 / NEW MODEL / A+外链 / 旗舰店上新 / 商城上单 / VC品SC上单 / 页面Promotion（7 条独立流程）">
+      <div class="left-card">
+        <div class="flow-wrap" id="flow-stage">
+            <div class="ncv" id="flow-canvas">
+<div class="tag-row">
+          <a class="flow-tag" href="#" target="_blank" rel="noopener">
+          <span class="ft-main">流程图</span><span class="ft-sep" aria-hidden="true">|</span><span class="ft-act">本阶段共计 7 个子流程</span>
+        </a>
+          <button class="zoom-btn" id="zoom-btn" type="button" aria-label="全屏放大流程图" title="全屏放大">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="9.6" y1="6.4" x2="14" y2="2"/><polyline points="9.6,2 14,2 14,6.4"/>
+            <line x1="6.4" y1="9.6" x2="2" y2="14"/><polyline points="2,9.6 2,14 6.4,14"/>
+          </svg>
+        </button>
+        </div>
+              <div class="ncview">
+                <div class="ncstage" id="flow-matrix"><svg class="ncsvg" id="nc-svg" aria-hidden="true"></svg></div>
+              </div>
+            </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane-right" aria-label="右上：子标题色条 ｜ 右下：两张列表卡">
+      <div class="blk blk-1">
+        <div class="blk-body banner">
+          <div class="banner-stack">
+          <div class="banner-row">
+            <a class="banner-label" href="#">
+              <span class="bl-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#22C55E"/><polyline points="7.4,12.5 10.8,15.9 16.8,9.3" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              阶段标准
+              <svg class="bl-arrow" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 10a.75.75 0 01.75-.75h6.638L10.23 7.29a.75.75 0 111.04-1.08l3.5 3.25a.75.75 0 010 1.08l-3.5 3.25a.75.75 0 11-1.04-1.08l2.158-1.96H5.75A.75.75 0 015 10z" clip-rule="evenodd"/></svg>
+            </a>
+            <div class="banner-content">公司审核通过 | 合规立项</div>
+          </div>
+          <div class="banner-row">
+            <a class="banner-label" href="#">
+              <span class="bl-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#F59E0B"/>
+                  <path d="M9.6 9.1V8.3a2.4 2.4 0 0 1 2.4-2.4h0a2.4 2.4 0 0 1 2.4 2.4v0.8"
+                        fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/>
+                  <rect x="6.6" y="9.6" width="10.8" height="7.4" rx="1.8" fill="#FFFFFF"/>
+                  <path d="M6.6 13h10.8" stroke="#F59E0B" stroke-width="1.6"/>
+                </svg>
+              </span>
+              销售动作
+              <svg class="bl-arrow" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5 10a.75.75 0 01.75-.75h6.638L10.23 7.29a.75.75 0 111.04-1.08l3.5 3.25a.75.75 0 010 1.08l-3.5 3.25a.75.75 0 11-1.04-1.08l2.158-1.96H5.75A.75.75 0 015 10z" clip-rule="evenodd"/></svg>
+            </a>
+            <div class="banner-content">做分析 | 无竞争力终止立项</div>
+          </div>
+          </div>
+        </div>
+      </div>
+      <div class="blk-row">
+        <div class="blk blk-merged"><div class="blk-body list-body merged-body"><div class="merge-cols">
+<div class="merge-col"><div class="list-head"><span class="li-dot" style="background:#22C55E"></span><p>❓销售做什么</p></div>
+<div class="list-group"><div class="list-items" data-fold="6"><div class="list-item"><span class="li-dot" style="background:#22C55E"></span><p>品类规划一页纸（模板）</p><span class="li-val">01</span></div><div class="list-item"><span class="li-dot" style="background:#22C55E"></span><p>坑位拉通记录表</p><span class="li-val">02</span></div><div class="list-item"><span class="li-dot" style="background:#22C55E"></span><p>品类方向提案（汇报版）</p><span class="li-val">03</span></div></div></div></div>
+<div class="merge-col"><div class="list-head"><span class="li-dot" style="background:#E07B2F"></span><p>❓向谁要什么</p></div>
+<div class="list-group"><div class="list-items" data-fold="6"><div class="list-item"><span class="li-dot" style="background:#E07B2F"></span><p>拉通 SOP（流程指引）</p><span class="li-val">01</span></div><div class="list-item"><span class="li-dot" style="background:#E07B2F"></span><p>品类规划操作手册</p><span class="li-val">02</span></div><div class="list-item"><span class="li-dot" style="background:#E07B2F"></span><p>市场洞察数据源</p><span class="li-val">03</span></div><div class="list-item"><span class="li-dot" style="background:#E07B2F"></span><p>关键词分层参考表</p><span class="li-val">04</span></div></div></div></div>
+</div></div></div>
+      </div>
+    </section>
+
+  </div>
+
+</main>
+
+<div class="fl-ov" id="fl-ov">
+  <div class="fl-ov-card">
+    <div class="fl-ov-head">
+      <b>流程图</b>
+      <span>7 条独立流程 · 悬停可放大</span>
+      <button class="fl-close" id="fl-close" aria-label="关闭">×</button>
+    </div>
+    <div class="fl-ov-body">
+      
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+        /* ---------- 数据：由原流程图内容生成 ---------- */
+        /* ============================================================
+           内容区：复用只改这里，其余设计 / 字号 / 颜色 / 布局 / 动效都不要改
+           字段对应关系见右下角「说明 / 源码」
+           ============================================================ */
+        var BOARD = {
+  "序号": "23",
+  "阶段": "操盘期",
+  "环节名称": "PO下单",
+  "阶段标准": "DF/DDP灵活配置服务业务",
+  "销售动作": "接单",
+  "业务推进链路": "销售确认默认接单→跟单定期发布下单表格→销售确认→AMZ提货→FBV到仓",
+  "流程图提示语":"① VC PO下单 留存数据 https://songmicshome.feishu.cn/drive/folder/CQhXfhaz0lZcGUdiBqdcXJ7Nnle；\n② BTR主动下单 https://songmicshome.feishu.cn/wiki/WnRxwEt7eiNVMQkcwD6coLAknbf?from=from_parent_docx →每周四上午跟单发布测算→产品需提前完成SIOC认证 https://songmicshome.feishu.cn/docx/FyAHdqg9GovrchxFzBFc6VGendh →销售判断是否下单数量→跟单提报BTR→亚马逊审核→销售组内部监控消耗进度；\n③ DDP亚马逊下单 https://songmicshome.feishu.cn/docx/WpPTdgHs6omxbdxSZFscAEIhnjd?psg_id=1436816052933952775&refer_index=16&refer_type=citation→每周二上午跟单发布数据→销售判断是否不接单→跟单流转订单→亚马逊审核→销售组内部监控消耗进度；\n④ BULK BUY亚马逊批量采购下单 https://songmicshome.feishu.cn/docx/VXDRdcODaosAB3x2O2Nc3ub2nBf?psg_id=1669894050667791327&refer_index=8&refer_type=citation →每月22号跟单发布数据→销售判断接单价格及数量→跟单流转订单→销售组内部监控消耗进度；",
+  "销售做什么": "按需求选择优解模式合作\nBTR主动下单诉求\nBULK BUY/DDP被动接单",
+  "向谁要什么": "跟单提供测算下单数据"
+};
+
+        /* 文本解析与片段生成（纯函数，可单独测试） */
+        var RB = {
+          hl: function(s){ return RB.esc(s).replace(/【[^】]*】/g, function(m){ return '<span class="nch">' + m + '</span>'; }); },
+          esc: function(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); },
+          lines: function(t){ return String(t || "").split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean); },
+          cells: function(line){ return String(line || "").split(/[、，,]/).map(function(s){ return s.trim(); }).filter(Boolean); },
+          chain: function(t){ return String(t || "").split(/→|->|>|＞|\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean); },
+          listHTML: function(text, dot){
+            var L = RB.lines(text); if(!L.length) return "";
+            return L.map(function(t, i){
+              var n = (i + 1 < 10 ? "0" : "") + (i + 1);
+              return `<div class="list-item"><span class="li-dot" style="background:${dot}"></span><p>${RB.esc(t)}</p><span class="li-val">${n}</span></div>`;
+            }).join("");
+          },
+          flow: function(text, TPL){
+                /* ① ② ③ … 代表第几个独立子流程；；代表本流程结束（只作分隔、页面不显示） */
+                var raw = String(text == null ? "" : text).replace(/\r/g, "").trim();
+                if(!raw || raw === "无" || raw === "-") return null;
+                var CIRC = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+                /* 修复 A1：【…】内的带圈数字只作正文（如【⑦上架CHECK LIST】），不当子流程起始 */
+                var scan = raw.replace(/【[^】]*】/g, function(mm){ var o = ""; for(var q = 0; q < mm.length; q++) o += "\u0002"; return o; });
+                var marks = [], si;
+                for(si = 0; si < raw.length; si++){
+                  var ci = CIRC.indexOf(scan.charAt(si));
+                  if(ci >= 0) marks.push({ idx: si, no: ci + 1 });
+                }
+                var segs = [];
+                if(!marks.length){
+                  segs.push({ no: 1, text: raw });
+                } else {
+                  marks.forEach(function(mk, k){
+                    var stop = (k + 1 < marks.length) ? marks[k + 1].idx : raw.length;
+                    segs.push({ no: mk.no, text: raw.slice(mk.idx + 1, stop) });
+                  });
+                }
+                var chains = [], branch = [];
+                segs.forEach(function(seg){
+                  var body = seg.text.replace(/[;；]/g, "\n");
+                  var parts = body.split(/→|->|>|＞|\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+                  var cards = [], subs = [], cur = null, branchAdded = false;
+                  parts.forEach(function(part){
+                    var m = part.match(/^[（(]\s*设计分支\s*(\d+)\s*[)）]\s*([\s\S]*)$/);
+                    var isBr = !!m;
+                    var txt = String(isBr ? m[2] : part).trim();
+                    if(!txt) return;
+                    var title = txt, href = "";
+                    /* 修复 A2：链接可位于节点任意位置 —— 文字 https://…（补充） / 文字（https://…） / =HYPERLINK("url","文字") */
+                    var hm = txt.match(/=HYPERLINK\(\s*"([^"]+)"\s*,\s*"[^"]*"\s*\)/);
+                    if(hm){ href = hm[1].trim(); txt = txt.replace(hm[0], " ").trim(); }
+                    var um = txt.match(/^(.*?)(https?:\/\/[^\s\u3000-\u303F\uFF00-\uFFEF<>"“”‘’]+)([\s\S]*)$/);
+                    if(um){ href = um[2].trim(); txt = um[1] + um[3]; }
+                    title = txt.replace(/[（(]\s*[)\uff09]/g, "").replace(/\s{2,}/g, " ").trim();
+                    title = title.replace(/[;；]\s*$/, "").trim();
+                    if(!title || title === "本阶段结束" || title === "阶段结束") return;
+                    if(isBr){
+                      subs.push([]); cur = subs[subs.length - 1];
+                      if(!branchAdded){ cards.push({ title: "分支", branch: true }); branchAdded = true; }
+                      cur.push({ title: title, href: href });
+                      return;
+                    }
+                    (cur || cards).push({ title: title, href: href });
+                  });
+                  if(!cards.length && !subs.length) return;
+                  var num = String(seg.no);
+                  var plain = cards.filter(function(c){ return !c.branch; });
+                  cards.forEach(function(c, i){
+                    c.step = i + 1;
+                    if(c.branch){ c.color = "#0EA5E9"; c.icon = TPL.branch; return; }
+                    var idx = plain.indexOf(c);
+                    var isFirst = idx === 0, isLast = (idx === plain.length - 1 && plain.length > 1);
+                    c.color = (isFirst || isLast) ? "#22C55E" : "#7C6BF0";
+                    c.icon = isFirst ? TPL.start : (isLast ? TPL.check : TPL.play);
+                  });
+                  chains.push({ key: num, num: num, cards: cards });
+                  subs.forEach(function(list, k){
+                    if(!list.length) return;
+                    var bn = num + "." + (k + 1);
+                    branch.push({ key: bn, num: bn, isBranch: true, cards: list.map(function(c, j){
+                      c.step = j + 1; c.color = "#7C6BF0"; c.icon = TPL.play; return c;
+                    }) });
+                  });
+                });
+                if(!chains.length) return null;
+                return { chains: chains, branch: branch };
+              },          chainHTML: function(text){
+            var S = RB.chain(text); if(!S.length) return "";
+            var h = "";
+            S.forEach(function(s, i){
+              if(i) h += `<div class="st-sep"></div>`;
+              var st = (i === S.length - 1) ? "active" : "completed";
+              h += `<div class="st-item" data-state="${st}" data-step="${i + 1}"><button class="st-trigger" type="button" role="tab" aria-selected="${st === "active"}"><span class="st-ind"></span><span class="st-title">${RB.esc(s)}</span></button></div>`;
+            });
+            return h;
+          }
+        };
+        var CHAINS = [{"key": "1", "num": "1", "cards": [{"title": "确定僵尸", "href": "https://songmicshome.feishu.cn/wiki/Hg9bwWgs5iq8YPk71gzc2imYnXe?sheet=0TkFyj", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "僵尸修改图文&去掉A+&修改类目", "href": "", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 2}, {"title": "分支", "href": "", "color": "#0EA5E9", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M4.6 3.6v3.2a1.6 1.6 0 0 0 1.6 1.6h3.4\" stroke=\"currentColor\" stroke-width=\"1.4\" fill=\"none\" stroke-linecap=\"round\"/><path d=\"M6.1 6.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\" transform=\"translate(1.4,0)\"/></svg>", "branch": true, "step": 3}, {"title": "前台共享评分评分数成功", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 4}]}, {"key": "2", "num": "2", "cards": [{"title": "NEW MODEL", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "销售填写A+外链表", "href": "https://songmicshome.feishu.cn/wiki/Ne09wuVnCiV9BTk6X3lcpnTSnwg?sheet=dVJfoY", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 2}, {"title": "运营提报OA", "href": "", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 3}, {"title": "前台捆绑成功", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 4}]}, {"key": "3", "num": "3", "cards": [{"title": "A+外链", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "销售填写A+外链表", "href": "https://songmicshome.feishu.cn/wiki/Ne09wuVnCiV9BTk6X3lcpnTSnwg?sheet=dVJfoY", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 2}, {"title": "运营更新", "href": "", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 3}, {"title": "前台展示成功", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 4}]}, {"key": "4", "num": "4", "cards": [{"title": "旗舰店上新", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "RPA自动抓取更新", "href": "https://songmicshome.feishu.cn/wiki/Aw5dw4o0PiGOIvkXk0fct9smnOe", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 2}, {"title": "高坑产品关注旗舰店位置或优化", "href": "https://songmicshome.feishu.cn/wiki/NPXDw2CvxiotjCkajGNcMfqynef?sheet=0ZEowC", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 3}]}, {"key": "5", "num": "5", "cards": [{"title": "商城上单", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "销售填写商城上单表", "href": "https://songmicshome.feishu.cn/wiki/Ne09wuVnCiV9BTk6X3lcpnTSnwg?sheet=dVJfoY", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 2}]}, {"key": "6", "num": "6", "cards": [{"title": "VC品SC上单", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "销售填写SHEET<span class=\"hl\">【VC ASIN验证RRP SC上单】</span>", "href": "https://songmicshome.feishu.cn/wiki/MDhxwZNXCiRvrakPzHDcf4evnJc?sheet=UqYqkY", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 2}]}, {"key": "7", "num": "7", "cards": [{"title": "页面Promotion", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.6 3.4v7.2\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M6.6 3.9h4.1l-1.2 1.7 1.2 1.7H6.6z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "SC品销售填写SOM系统<span class=\"hl\">【营销活动管理】</span><span class=\"hl\">【Promotion】</span>创建页面折扣关联", "href": "https://songmicshome.feishu.cn/docx/EF6CdeNFboiQO8x3aZmcoQnon5f", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 2}, {"title": "运营创建", "href": "", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 3}, {"title": "前台CODE展示成功", "href": "", "color": "#22C55E", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><polyline points=\"3.6,7.4 6.1,9.9 10.6,4.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "branch": false, "step": 4}]}];
+        var BRANCH = [{"key": "1.1", "num": "1.1", "cards": [{"title": "同三级分类合并销售填写运营对接表合并", "href": "https://songmicshome.feishu.cn/drive/folder/In1Uf1ZNOlindzd3ePIcorAknwe?from=space_personal_filelist", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}], "isBranch": true}, {"key": "1.2", "num": "1.2", "cards": [{"title": "不同三级分类合并销售填写审核申请", "href": "https://songmicshome.feishu.cn/wiki/AsZlw7Xmdi8yu0k9kuicGHTPnhh", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 1}, {"title": "VC转SC综合单销售申请名额", "href": "https://songmicshome.feishu.cn/share/base/form/shrcnwCjkXOlBXoKW5j8R9Fg6Mg", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 2}, {"title": "特殊条件3变体调改2变体需要填写测试表", "href": "https://songmicshome.feishu.cn/sheets/GqL1sGRAEh0iJDtldUdcTzOEnkd", "color": "#7C6BF0", "icon": "<svg viewBox=\"0 0 14 14\" width=\"14\" height=\"14\"><path d=\"M6.1 4.6l4.6 2.9-4.6 2.9z\" fill=\"currentColor\"/></svg>", "branch": false, "step": 3}], "isBranch": true}];
+        /* 流程图色块样式模板：图标/颜色取自内置示例，流程内容只由「流程图」字段决定 */
+        var FLOW_TPL = {
+          start: CHAINS[0].cards[0].icon,
+          play: CHAINS[0].cards[1].icon,
+          branch: CHAINS[0].cards[2].icon,
+          check: CHAINS[0].cards[3].icon
+        };
+        /* 点入链接图标：斜曲线箭头 */
+        var LINKICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 11.6 11.6 4.4"/><path d="M6 4.4h5.6v5.6"/></svg>';
+        var ARROW  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h12.5"/><path d="M12.5 6.5 18 12l-5.5 5.5"/></svg>';
+
+        var CARD_W = 168, GAP_X = 18, GAP_Y = 18, PAD = 0, NUM_W = 28, PER_ROW = 5;
+            /* ============ 统一色块尺寸（对齐 03 CD立项 的「全新品」色块） ============
+               REF_W：一行 5 个色块的固定参考总宽（常量，与内容多少无关）
+               缩放比例只由可视区宽度决定 → 所有环节的色块屏幕尺寸完全一致；
+               高度放不下时先压行距、再让子流程共行压紧，色块尺寸始终不变。 */
+            /* 统一色块尺寸：一排 5 个铺满整个流程卡（左右贴边），各环节色块尺寸完全一致
+               REF_W = 序号列 28 + 5 个色块（168×5）+ 4 个间距（18×4）= 一行 5 个的参考总宽
+               CANON_H = 最多 8 行 × 高 80 + 7 × 最小行距 6（最高的环节也放得下） */
+            var ROW_H = 80, GAP_Y_MIN = 6, REF_W = 940, CANON_H = 682, GAP_X_MAX = 72;
+        var canvas = document.getElementById('flow-canvas');
+        var stage  = document.getElementById('flow-matrix');
+        var view   = document.querySelector('.ncview');
+        var svg    = document.getElementById('nc-svg');
+        var branchOpen = false, chains = [], contentW = 0, contentH = 0;
+
+        function hexA(hex, a){
+          var n = parseInt(hex.slice(1), 16);
+          return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+        }
+        function cardHTML(c){
+          var label = RB.hl(c.title || '');
+          var link = c.href ? '<a class="nclink" href="' + c.href + '" target="_blank" rel="noopener" aria-label="点入链接">' + LINKICON + '</a>' : '';
+          return '<span class="ncdot"></span><span class="nclabel">' + label + '</span>' + link +
+                 (c.branch ? '<span class="ncbr">\u25be</span>' : '');
+        }
+        function build(){
+          var defs = [];
+          CHAINS.forEach(function(ch){
+            defs.push(ch);
+            var hasBranch = ch.cards.some(function(c){ return !!c.branch; });
+            if(hasBranch){ BRANCH.forEach(function(b){ defs.push(b); }); }
+          });
+          defs.forEach(function(ch){
+            var item = {key:ch.key, num:ch.num, isBranch:!!ch.isBranch, cards:[]};
+            var numEl = document.createElement('div');
+            numEl.className = 'ncnum'; numEl.textContent = ch.num;
+            stage.appendChild(numEl); item.numEl = numEl;
+            ch.cards.forEach(function(cd){
+              var node  = document.createElement('div'); node.className = 'ncnode';
+              var scale = document.createElement('div'); scale.className = 'ncscale';
+              var card  = document.createElement('div');
+              card.className = 'nccard' + (cd.branch ? ' is-branch' : '');
+              card.title = cd.title || '';
+              card.innerHTML = cardHTML(cd);
+              scale.appendChild(card); node.appendChild(scale); stage.appendChild(node);
+              var rec = {data:cd, el:node};
+              item.cards.push(rec);
+              /* 点击事件绑在节点上：拖拽会 setPointerCapture，绑在内层卡片上收不到 click */
+              if(cd.branch){
+                node.setAttribute('data-branch', '1');
+                node.addEventListener('click', function(e){
+                  e.preventDefault(); e.stopPropagation();
+                  branchOpen = !branchOpen;
+                  layout();
+                });
+              } else if(cd.href){
+                node.setAttribute('data-link', '1');
+                node.addEventListener('click', function(e){
+                  e.stopPropagation();
+                  var ic = node.querySelector('.nclink');
+                  if(ic){ ic.classList.add('is-clicked'); setTimeout(function(){ ic.classList.remove('is-clicked'); }, 900); }
+                  window.open(cd.href, '_blank');
+                });
+              }
+              attachDrag(node, rec);
+            });
+            chains.push(item);
+          });
+        }
+        function size(w, h){
+          contentW = Math.max(contentW, w); contentH = Math.max(contentH, h);
+          stage.style.minWidth = contentW + 'px'; stage.style.minHeight = contentH + 'px';
+          svg.setAttribute('width', contentW); svg.setAttribute('height', contentH);
+        }
+        function canonW(){
+              var nodeW = CARD_W;
+              if(chains.length && chains[0].cards.length){
+                nodeW = Math.round(chains[0].cards[0].el.offsetWidth) || CARD_W;
+              }
+              return Math.max(REF_W, NUM_W + PER_ROW * nodeW + (PER_ROW - 1) * GAP_X);
+            }
+            /* 统一缩放比例：只看可视区宽度（= 03 CD立项 的基准尺寸），与内容多少无关 */
+            function fitK(){
+              if(!view) return 1;
+              var innerW = view.clientWidth, innerH = view.clientHeight;
+              var k = Math.min(
+                innerW > 0 ? innerW / REF_W : 1,
+                innerH > 0 ? innerH / CANON_H : 1);
+              if(!isFinite(k) || k <= 0) k = 1;
+              /* 不设放大上限：屏幕越大色块越大；各环节共用同一比例，尺寸始终一致 */
+              return Math.max(0.35, k);
+            }
+            function fit(){
+              if(!view || !stage) return;
+              var k = fitK();
+              /* 兜底：压紧排版后仍超出可视区时才收缩（正常情况不触发） */
+              if(contentH > 0 && contentH * k > view.clientHeight){
+                k = Math.max(0.4, view.clientHeight / contentH);
+              }
+              var dx = 0, dy = 0;   /* 内容自左侧顶部起排，富余空间留右/下 */
+              stage.style.transformOrigin = '0 0';
+              stage.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + k.toFixed(6) + ')';
+            }
+        function allCards(){
+          var out = [];
+          chains.forEach(function(ch){ ch.cards.forEach(function(c){ out.push(c); }); });
+          return out;
+        }
+        function normalize(){
+          var MINF = 7, BASEF = 12.5;
+          var recs = allCards().filter(function(c){ return c.el.style.display !== 'none' && c.el.offsetParent !== null; });
+          recs.forEach(function(c){
+            var card = c.el.querySelector('.nccard'); if(!card) return;
+            card.style.fontSize = '';
+            var fs = BASEF;
+            while(card.scrollHeight > card.clientHeight + 1 && fs > MINF){
+              fs -= 0.5; card.style.fontSize = fs.toFixed(1) + 'px';
+            }
+          });
+        }
+        function layout(){
+              chains.forEach(function(ch){
+                var vis = !(ch.isBranch && !branchOpen);
+                ch.cards.forEach(function(c){ c.el.style.display = vis ? '' : 'none';
+                  if(c.data && c.data.branch){
+                    c.el.classList.toggle('is-open', !!branchOpen);
+                    var br = c.el.querySelector('.ncbr'); if(br) br.textContent = branchOpen ? '\u25b4' : '\u25be';
+                  }
+                });
+              });
+              normalize();
+              var visChains = chains.filter(function(ch){ return !(ch.isBranch && !branchOpen); });
+              var kFix = fitK();
+              var availH = (view && kFix > 0) ? view.clientHeight / kFix : 1e9;
+              var budgetW = canonW();
+              visChains.forEach(function(ch){
+                ch.cards.forEach(function(c){
+                  c.w0 = Math.round(c.el.offsetWidth) || CARD_W;
+                  var cc = c.el.querySelector('.nccard');
+                  c.cw0 = cc ? (Math.round(cc.offsetWidth) || CARD_W) : CARD_W;
+                });
+              });
+              function rowWidth(items){
+                var w = 0;
+                items.forEach(function(it, i){ w += (i ? GAP_X : 0) + (it.offset ? NUM_W : 0) + it.c.w0; });
+                return w;
+              }
+              /* 版式一：每条子流程独立成行组（原排版，高度够用时完全不变） */
+              function rowsPlain(){
+                var rows = [];
+                visChains.forEach(function(ch){
+                  for(var s = 0; s < ch.cards.length; s += PER_ROW){
+                    var items = [];
+                    ch.cards.slice(s, s + PER_ROW).forEach(function(c, i){
+                      items.push({c:c, ch:ch, offset:(i === 0 && !!ch.num), num:(i === 0 && s === 0 && !!ch.num)});
+                    });
+                    rows.push(items);
+                  }
+                });
+                return rows;
+              }
+              function gapFor(rows){
+                if(rows.length < 2) return GAP_Y;
+                if(rows.length * ROW_H + (rows.length - 1) * GAP_Y <= availH) return GAP_Y;
+                var g = Math.floor((availH - rows.length * ROW_H) / (rows.length - 1));
+                if(!isFinite(g)) g = GAP_Y_MIN;
+                return Math.max(GAP_Y_MIN, Math.min(GAP_Y, g));
+              }
+              function totalH(rows, gap){
+                if(!rows.length) return 0;
+                return rows.length * ROW_H + (rows.length - 1) * gap;
+              }
+              /* 版式固定：每条子流程独立成行组、序号贴第一列开头；高度不足只压行距，不动色块尺寸 */
+              var rows = rowsPlain();
+              var gapY = gapFor(rows);
+              /* 横向间距：让「一排 5 个」铺满整个流程卡（左右贴边） */
+              var gapX = GAP_X;
+              if(view && kFix > 0){
+                var flowW = view.clientWidth / kFix;
+                if(flowW > REF_W) gapX = Math.min(GAP_X_MAX, GAP_X + (flowW - REF_W) / (PER_ROW - 1));
+              }
+              chains.forEach(function(ch){
+                if(ch.isBranch && !branchOpen) ch.numEl.classList.add('hidden');
+                else ch.numEl.classList.remove('hidden');
+              });
+              var y = PAD, right = 0;
+              rows.forEach(function(items, ri){
+                var cx = PAD, rowH = 0;
+                items.forEach(function(it, ii){
+                  if(it.offset){ cx += NUM_W; }
+                  if(it.num){ it.numX = it.offset ? (cx - NUM_W) : Math.max(0, cx - GAP_X + 2); }
+                  var c = it.c;
+                  c.el.style.display = '';
+                  c.w = c.w0; c.cw = c.cw0; c.x = cx; c.y = y; c.row = ri;
+                  c.el.style.transform = 'translate3d(' + cx + 'px,' + y + 'px,0)';
+                  rowH = Math.max(rowH, c.el.offsetHeight);
+                  right = Math.max(right, cx + c.w);
+                  it.cardX = cx;
+                  cx += c.w + gapX;
+                });
+                items.forEach(function(it){ it.c.midY = y + rowH / 2; });
+                items.forEach(function(it){
+                  if(!it.num) return;
+                  it.ch.numEl.style.display = '';
+                  it.ch.numEl.style.left = it.numX + 'px';
+                  it.ch.numEl.style.top = (y + ROW_H / 2 - 12) + 'px';
+                });
+                y += rowH + gapY;
+              });
+              chains.forEach(function(ch){ if(!ch.num) ch.numEl.style.display = 'none'; });
+              contentW = 0; contentH = 0;
+              size(right + PAD, (rows.length ? y - gapY : 0) + PAD);
+              draw();
+              fit();
+            }
+        function draw(){
+          var out = '';
+          chains.forEach(function(ch){
+            if(ch.isBranch && !branchOpen) return;
+            for(var i = 0; i < ch.cards.length - 1; i++){
+              var a = ch.cards[i], b = ch.cards[i + 1];
+              if(a.row !== b.row){
+                    /* 同一条独立流程转行：用虚线连接上下两行中「距离最近的两个色块」（同列优先） */
+                    var upper = ch.cards.filter(function(c){ return c.row === a.row && c.el.offsetWidth > 0; });
+                    var lower = ch.cards.filter(function(c){ return c.row === b.row && c.el.offsetWidth > 0; });
+                    var cp = null, cq = null, cd = -1;
+                    /* 从右往左找：同为最小间距时取最靠右的一对（即上一行末块正下方的那个色块） */
+                    upper.slice().reverse().forEach(function(p){
+                      var pcx = p.x + (p.cw || CARD_W) / 2;
+                      lower.forEach(function(q){
+                        var qcx = q.x + (q.cw || CARD_W) / 2;
+                        var d = Math.abs(pcx - qcx);
+                        if(cd < 0 || d < cd - 0.001){ cd = d; cp = p; cq = q; }
+                      });
+                    });
+                    if(cp && cq){
+                      var sx2 = cp.x + (cp.cw || CARD_W) / 2, sy2 = cp.y + (cp.el.offsetHeight || ROW_H);
+                      var ex2 = cq.x + (cq.cw || CARD_W) / 2, ey2 = cq.y;
+                      out += '<path d="M' + sx2 + ',' + sy2 + ' L' + ex2 + ',' + ey2 + '" ' +
+                             'fill="none" stroke="#A9B4C0" stroke-width="1.4" stroke-dasharray="5,5" ' +
+                             'stroke-linecap="round"></path>';
+                    }
+                    continue;
+                  }
+              var ah = a.el.offsetHeight, bh = b.el.offsetHeight;
+              var base = (a.midY || a.y);
+              /* 起点贴前一个色块右缘、终点贴后一个色块左缘（中间空隙由连线填满） */
+              var sx = a.x + (a.cw || CARD_W), ex = b.x;
+              out += '<path d="M' + sx + ',' + base + ' L' + ex + ',' + base + '" ' +
+                     'fill="none" stroke="' + (ch.isBranch ? '#A9B4C0' : '#C9CFD6') + '" ' +
+                     'stroke-width="' + (ch.isBranch ? 1.4 : 1.6) + '"' +
+                     (ch.isBranch ? ' stroke-dasharray="5,5"' : '') + ' stroke-linecap="round"></path>';
+            }
+          });
+          svg.innerHTML = out;
+        }
+        /* 拖拽：无惯性、不小于 0（与组件一致） */
+        function attachDrag(el, rec){
+          var start = null;
+          el.addEventListener('pointerdown', function(e){
+            if(e.button !== 0) return;
+            if(e.target.closest && e.target.closest('a,button')) return;
+            el.setPointerCapture(e.pointerId); el.classList.add('dragging');
+            start = {x:rec.x || 0, y:rec.y || 0, px:e.clientX, py:e.clientY};
+            e.preventDefault();
+          });
+          el.addEventListener('pointermove', function(e){
+            if(!start) return;
+            var nx = Math.max(0, start.x + (e.clientX - start.px));
+            var ny = Math.max(0, start.y + (e.clientY - start.py));
+            rec.x = nx; rec.y = ny;
+            el.style.transform = 'translate3d(' + nx + 'px,' + ny + 'px,0)';
+            size(nx + CARD_W + PAD, ny + el.offsetHeight + PAD);
+            draw();
+          });
+          function end(e){
+            if(!start) return; start = null;
+            el.classList.remove('dragging');
+            if(e && e.pointerId !== undefined && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+          }
+          el.addEventListener('pointerup', end);
+          el.addEventListener('pointercancel', end);
+        }
+
+        function applyBoard(){
+          var mv = function(sel, val){ var e = document.querySelector(sel); if(e && val) e.textContent = val; };
+          mv(".si-num", BOARD["序号"]);
+          mv(".si-stage", BOARD["阶段"]);
+          mv(".si-name", BOARD["环节名称"]);
+          var rows = document.querySelectorAll(".banner-stack .banner-row");
+          if(rows[0]) mv(".banner-stack .banner-row:nth-child(1) .banner-content", BOARD["阶段标准"]);
+          if(rows[1]) mv(".banner-stack .banner-row:nth-child(2) .banner-content", BOARD["销售动作"]);
+          var nav = document.querySelector(".chain-card .st-nav");
+          if(nav){ var ch = RB.chainHTML(BOARD["业务推进链路"]); if(ch) nav.innerHTML = ch; }
+          var lists = document.querySelectorAll(".merge-col .list-items");
+          if(lists[0]){ var h1 = RB.listHTML(BOARD["销售做什么"], "#22C55E"); if(h1) lists[0].innerHTML = h1; }
+          if(lists[1]){ var h2 = RB.listHTML(BOARD["向谁要什么"], "#E07B2F"); if(h2) lists[1].innerHTML = h2; }
+          applyFlow(BOARD["流程图提示语"]);
+          var tag = document.querySelector(".flow-tag .ft-act");
+          if(tag) tag.textContent = CHAINS.length ? ("本阶段共计 " + CHAINS.length + " 个子流程") : "本环节无子流程";
+        }
+        function applyFlow(tips){
+          var r = RB.flow(tips, FLOW_TPL);
+          if(!r){ CHAINS = []; BRANCH = []; return; }   /* 字段为空/无 → 不展示流程色块 */
+          CHAINS = r.chains;
+          BRANCH = r.branch;
+        }
+        applyBoard();
+        build(); layout();
+        window.addEventListener('resize', function(){ setTimeout(layout, 120); });
+
+        /* 全屏放大 */
+        var ov = document.getElementById('fl-ov'), closeBtn = document.getElementById('fl-close');
+        var zoomBtn = document.getElementById('zoom-btn'), ovBody = document.querySelector('.fl-ov-body');
+        var wrapHost = document.getElementById('flow-stage');
+        function show(){
+          if(ovBody){
+            ovBody.innerHTML = '';
+            canvas.style.width = '100%'; canvas.style.height = '100%';
+            ovBody.appendChild(canvas);
+          }
+          ov.classList.add('show');
+          layout();
+        }
+        function hide(){
+          ov.classList.remove('show');
+          canvas.style.width = ''; canvas.style.height = '';
+          if(wrapHost && canvas.parentNode !== wrapHost) wrapHost.appendChild(canvas);
+          layout();
+        }
+        if(zoomBtn) zoomBtn.addEventListener('click', function(e){ e.stopPropagation(); show(); });
+        if(closeBtn) closeBtn.addEventListener('click', hide);
+        if(ov) ov.addEventListener('click', function(e){ if(e.target === ov) hide(); });
+        document.addEventListener('keydown', function(e){ if(e.key === 'Escape') hide(); });
+        canvas.addEventListener('click', function(e){
+          if(e.target.closest && e.target.closest('.ncnode')) return;
+          show();
+        });
+      })();
+
+  // 业务推进链路：点击任一步骤即切换（完成态 = 序号小于当前步）
+  (function(){
+    var nav=document.querySelector('.chain-card .st-nav');
+    if(!nav) return;
+    var items=[].slice.call(nav.querySelectorAll('.st-item'));
+    var seps=[].slice.call(nav.querySelectorAll('.st-sep'));
+    var hasChk=function(idx){ return items[idx].getAttribute('data-state')==='completed'; };
+    var CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,13 10,18 19,7"/></svg>';
+    function paint(){
+      items.forEach(function(it,idx){
+        var num=it.getAttribute('data-step');
+        var ind=it.querySelector('.st-ind');
+        ind.innerHTML = it.getAttribute('data-state')==='completed' ? CHK : num;
+        it.querySelector('.st-trigger').setAttribute('aria-selected', it.getAttribute('data-state')==='active' ? 'true':'false');
+      });
+      seps.forEach(function(s,idx){ s.style.background = items[idx].getAttribute('data-state')==='completed' ? '#1A3A5C' : '#E4E4E7'; });
+    }
+    nav.addEventListener('click', function(e){
+      var it=e.target.closest ? e.target.closest('.st-item') : null;
+      if(!it) return;
+      var active=parseInt(it.getAttribute('data-step'),10);
+      items.forEach(function(x){ var n=parseInt(x.getAttribute('data-step'),10);
+        x.setAttribute('data-state', n<active ? 'completed' : (n===active ? 'active' : 'inactive')); });
+      paint();
+    });
+    paint();
+  })();
+
+  // ❓列表：默认最多展示 6 条，超出部分折叠，可一键展开/收起
+  (function(){
+    var DEFAULT_MAX = 6;
+    [].slice.call(document.querySelectorAll('.list-items')).forEach(function(box){
+      var limit = parseInt(box.getAttribute('data-fold') || DEFAULT_MAX, 10);
+      var items = [].slice.call(box.querySelectorAll('.list-item'));
+      if(items.length <= limit) return;
+      items.forEach(function(it, i){ /* unfolded by default */ });
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'more-toggle'; btn.setAttribute('aria-expanded','false');
+      btn.textContent = '展开全部 ' + items.length + ' 条 \u25be';
+      var open = false;
+      btn.addEventListener('click', function(e){
+        e.stopPropagation(); open = !open;
+        items.forEach(function(it, i){ /* always show */ });
+        btn.textContent = open ? '收起 \u25b4' : ('展开全部 ' + items.length + ' 条 \u25be');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      box.appendChild(btn);
+    });
+  })();
+</script>
+
+<button class="doc-btn" id="doc-btn" type="button">说明 / 源码</button>
+<div class="doc-ov" id="doc-ov">
+  <div class="doc-card">
+    <div class="doc-head">
+      <b>阶段板块 · 交付说明</b>
+      <div class="doc-tabs">
+        <button class="doc-tab is-on" data-tab="map" type="button">字段映射</button>
+        <button class="doc-tab" data-tab="reuse" type="button">复用说明</button>
+        <button class="doc-tab" data-tab="spec" type="button">设计规范</button>
+        <button class="doc-tab" data-tab="code" type="button">CSS / JS 解读</button>
+        <button class="doc-tab" data-tab="src" type="button">完整源码</button>
+      </div>
+      <button class="doc-close" id="doc-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="doc-body">
+      <section class="doc-pane is-on" data-pane="map">
+        <h3>一、字段映射（复用只改内容）</h3>
+        <table>
+          <tr><th>版面位置</th><th>取值字段</th><th>规则</th></tr>
+          <tr><td>左上圆形序号 <code>03</code></td><td>序号</td><td>深蓝圆底、白字</td></tr>
+          <tr><td>序号右侧色块左半 <code>掌旗期</code></td><td>阶段</td><td>深蓝色块内、白字</td></tr>
+          <tr><td>序号右侧色块右半 <code>CD立项</code></td><td>环节名称</td><td>同一色块内、品牌橙 #E07B2F</td></tr>
+          <tr><td>「阶段标准」右侧文字</td><td>阶段标准</td><td>纯文本，可用「 | 」分隔</td></tr>
+          <tr><td>「销售动作」右侧文字</td><td>销售动作</td><td>纯文本，可用「 | 」分隔</td></tr>
+          <tr><td>「CD立项」右侧整排链路</td><td>业务推进链路</td><td>用「→」或换行分隔步骤，最后一步自动为当前步</td></tr>
+          <tr><td>流程图标签「本阶段共计 N 个子流程」</td><td>自动计算</td><td>N = 流程图提示语字段里的子流程行数（即序号个数）</td></tr>
+          <tr><td>流程图的子流程 / 节点 / 分支 / 链接</td><td>流程图提示语</td><td>一个子流程一行，用「；」或换行分隔；节点之间用「→」分隔；节点写成「文字 https://链接」即带点入链接；分支节点写成「（设计分支1）文字 https://链接」，自动生成可展开的分支行；文字为「本阶段结束」的节点不生成色块（版面固定保留底部「本阶段结束」一行）</td></tr>
+          <tr><td>❓销售做什么 下的条目</td><td>销售做什么</td><td>一行一条；右侧 01/02… 自动编号；默认显示 6 条，超出折叠可展开</td></tr>
+          <tr><td>❓向谁要什么 下的条目</td><td>向谁要什么</td><td>同上</td></tr>
+        </table>
+        <div class="doc-tools" style="margin-top:12px">
+          <button id="copy-md" type="button">复制 Markdown 文档</button>
+          <button id="open-self" type="button">在新标签打开可视化预览</button>
+        </div>
+        <p class="doc-tip" id="self-url"></p>
+      </section>
+      <section class="doc-pane" data-pane="reuse">
+        <h3>二、复用规则（只改内容，不改设计）</h3>
+        <ol>
+          <li>只修改文件顶部 <code>var BOARD = { ... }</code> 里的取值字段内容。</li>
+          <li>不要改 CSS、字号、颜色、版面布局与动效。</li>
+          <li>内容过多时的默认行为：流程图按可用空间等比缩放、四边留白 ≥3mm；两个 ❓ 列表默认显示 6 条，其余折叠为「展开全部 N 条 ▾」。</li>
+          <li>改完直接打开文件即可，无需其它调整；换一行数据即换一张板块图。</li>
+          <li>右下角「说明 / 源码」是交付入口（仅用于查看字段映射与源码），正式使用时可直接删除该按钮与抽屉代码，不影响看板。</li>
+        </ol>
+        <h3>三、字段写法示例</h3>
+        <ul>
+          <li><code>"业务推进链路": "销售监控前后台产品运营正常 → 销售组沟通异常 → 联动VC组中台递出诉求"</code></li>
+          <li><code>"流程图提示语": "确定僵尸 https://… →僵尸修改图文→（设计分支1）同三级分类合并 https://… →本阶段结束；NEW MODEL→销售填写A+外链表 https://… →运营提报OA；"</code></li>
+          <li><code>"销售做什么": "品类规划一页纸（模板)\n坑位拉通记录表\n品类方向提案（汇报版)"</code></li>
+        </ul>
+      </section>
+      <section class="doc-pane" data-pane="spec">
+        <h3>一、颜色令牌</h3>
+        <table>
+          <tr><th>用途</th><th>取值</th></tr>
+          <tr><td>主深蓝（序号圆底、阶段色块、链路激活、标题）</td><td><code>#1A3A5C</code></td></tr>
+          <tr><td>品牌橙（环节名称、<code>【…】</code> 高亮、点入链接箭头、分支三角、「本阶段结束」）</td><td><code>#E07B2F</code></td></tr>
+          <tr><td>绿色（胶囊圆点、图标点击反馈）</td><td><code>#22C55E</code></td></tr>
+          <tr><td>分支胶囊边框</td><td><code>#E14B4B</code>（1.5px）</td></tr>
+          <tr><td>色块 / 胶囊底色、边框</td><td><code>#F4F5F6</code> / <code>#E6E9ED</code></td></tr>
+          <tr><td>正文 / 次级文字</td><td><code>#1F2937</code> / <code>#71717A</code></td></tr>
+          <tr><td>连线：主干实线 / 分支虚线</td><td><code>#C9CFD6</code> 1.6px / <code>#A9B4C0</code> 1.4px（5,5 虚线）</td></tr>
+        </table>
+        <h3>二、字体与字号</h3>
+        <p>字体：<code>PingFang SC / Microsoft YaHei / Noto Sans SC</code>；序号与阶段标题 20px/800，胶囊文字 12.5px/600（过长自动降到 7px），链路标题 14px/600，❓列表内容 14px/500，说明 10.5px。</p>
+        <h3>三、尺寸与间距</h3>
+        <table>
+          <tr><th>元素</th><th>规格</th></tr>
+          <tr><td>序号圆形徽标</td><td>36px 圆、白字 17px/800</td></tr>
+          <tr><td>阶段｜环节名称色块</td><td><code>padding:6px 18px;border-radius:10px</code>，两词同字号、中间 1px 半透明白竖线</td></tr>
+          <tr><td>流程图胶囊</td><td>固定 <b>168×80px</b>、<code>border-radius:999px</code>、内边距 22px；<b>一排最多 5 个色块</b>，超出自动换行（续行与首行左对齐、间距 18px）</td></tr>
+          <tr><td>胶囊圆点</td><td>7px 圆形</td></tr>
+          <tr><td>流程图行距 / 行号</td><td>行距 18px；行号垂直居中（top = 行顶 + 28）</td></tr>
+          <tr><td>流程图色块内边距</td><td>3mm（画布视口内边距 0，图表四边留白 ≥3mm）</td></tr>
+          <tr><td>左右两栏</td><td><code>minmax(0,2fr) minmax(0,1fr)</code>，两栏间隔 3mm</td></tr>
+          <tr><td>❓两个列表面板</td><td>同一色块内上下等分，条目间距 8px、内边距 12px</td></tr>
+        </table>
+        <h3>四、交互与动效</h3>
+        <ul>
+          <li>流程图胶囊：悬停放大 1.5 倍并置顶（不透明底 + 阴影）；有链接显示点入链接斜线箭头（默认橙、点击绿）</li>
+          <li>分支胶囊：红色边框，整块可点展开 / 收起分支行，展开与按下时三角变绿；展开行用虚线连接主干</li>
+          <li>业务推进链路：文字悬停放大 1.1 倍</li>
+          <li>❓列表条目：悬停放大 1.06 倍；超过 6 条自动折叠，显示「展开全部 N 条 ▾ / 收起 ▴」</li>
+          <li>全屏放大：点画布空白或右上角按钮进入；<code>Esc</code> / × / 点遮罩关闭（搬运真实面板而非克隆）</li>
+        </ul>
+        <h3>五、整板一屏规则</h3>
+        <p>页面 <code>height:100dvh;overflow:hidden</code>，各层容器 <code>min-height:0</code> + grid 行 <code>minmax(0,1fr)</code>；流程图按可用宽高等比缩放（不放大，超过可用空间才等比缩小），内容从左侧顶部开始排列（不做居中），富余空间留在右侧与下方，不出现滚动条。</p>
+      </section>
+      <section class="doc-pane" data-pane="code">
+        <h3>一、文件结构</h3>
+        <p>单文件、零依赖：所有样式在 <code>&lt;style&gt;</code>，所有逻辑在 <code>&lt;script&gt;</code>，双击即可运行。顶部 <code>BOARD</code> 是全部文案来源，<code>RB</code> 负责文本拆分、转义与片段生成。</p>
+        <h3>二、CSS 关键类</h3>
+        <table>
+          <tr><th>类名</th><th>作用</th></tr>
+          <tr><td><code>.page / .split</code></td><td>整板尺寸与左右两栏（2:1），锁定一屏高度</td></tr>
+          <tr><td><code>.stage-id / .si-num / .si-title</code></td><td>左上序号圆徽标 + 阶段｜环节名称色块</td></tr>
+          <tr><td><code>.st-nav / .st-trigger / .st-title</code></td><td>业务推进链路：圆点 + 文字，文字悬停放大 1.1 倍</td></tr>
+          <tr><td><code>.ncv / .ncview / .ncstage</code></td><td>流程图色块 → 画布视口 → 节点层（缩放与居中在此发生）</td></tr>
+          <tr><td><code>.ncnode / .nccard / .ncdot / .nclabel / .nclink / .nch</code></td><td>流程图节点：圆点 + 文字 + 椭圆灰色胶囊（固定 168×80px，一排最多 5 个、超出换行）；有链接的节点右侧带点入链接**斜线箭头** <code>.nclink</code>；<code>【…】</code> 内容用 <code>.nch</code> 显示为品牌橙；文字自动换行、字号自动缩小保证全部展示；悬停放大 1.5 倍</td></tr>
+          <tr><td><code>.merge-col / .list-item / .li-val</code></td><td>右侧两个 ❓ 列表：条目、右侧自动编号、折叠展开</td></tr>
+        </table>
+        <h3>三、JS 关键函数</h3>
+        <table>
+          <tr><th>函数</th><th>作用</th></tr>
+          <tr><td><code>applyBoard()</code></td><td>把 BOARD 写入版面：序号/阶段/环节名称、两条横幅、链路、两个列表、子流程数</td></tr>
+          <tr><td><code>applyFlow() / RB.flow()</code></td><td>解析「流程图提示语」字段，生成子流程行、节点、分支行与点入链接，套用模板图标与配色</td></tr>
+          <tr><td><code>build() / layout()</code></td><td>生成节点并按行定位，计算行号、行高与内容尺寸</td></tr>
+          <tr><td><code>normalize()</code></td><td>胶囊固定 168×80px、内容自动换行；仍超出高度时自动递减字号（12.5px→7px），保证文字全部展示</td></tr>
+          <tr><td><code>fit()</code></td><td>整张流程图按可用宽高等比缩放（上限 1.25），高度方向居中，四边留 ≥3mm</td></tr>
+          <tr><td><code>draw()</code></td><td>绘制节点之间的连接线：主干为实线、分支行为虚线</td></tr>
+          <tr><td><code>show() / hide()</code></td><td>全屏放大：把同一块面板搬进浮层（非克隆），关闭后搬回，展开分支与拖拽均可正常使用</td></tr>
+        </table>
+        <h3>四、动效清单</h3>
+        <ul>
+          <li>流程图色块悬停：放大 1.5 倍 + 置顶 + 不透明白底（0.2s ease）</li>
+          <li>链路文字悬停：放大 1.1 倍（0.18s）</li>
+          <li>❓条目悬停：放大 1.06 倍</li>
+          <li>流程图放大浮层：点画布空白或右上角按钮进入；Esc / × / 点遮罩关闭</li>
+        </ul>
+      </section>
+      <section class="doc-pane" data-pane="src">
+        <div class="doc-tools">
+          <button id="copy-src" type="button">复制完整源码</button>
+          <button id="dl-src" type="button">下载 HTML</button>
+          <button id="load-src" type="button">重新抓取当前源码</button>
+        </div>
+        <pre class="doc-pre" id="src-pre">点击上方「重新抓取当前源码」即可显示本页完整源码（含 CSS / JS）。</pre>
+        <p class="doc-tip">源码为当前页面实时代码，可直接复制或下载后修改内容复用。</p>
+      </section>
+    </div>
+  </div>
+</div>
+<script type="text/plain" id="md-src">
+# 阶段板块看板 · 字段映射与复用说明
+
+## 一、字段映射（复用只改内容）
+
+| 版面位置 | 取值字段 | 规则 |
+| --- | --- | --- |
+| 左上圆形序号 03 | 序号 | 深蓝圆底、白字 |
+| 序号右侧色块左半 掌旗期 | 阶段 | 深蓝色块内、白字 |
+| 序号右侧色块右半 CD立项 | 环节名称 | 同一色块内、品牌橙 #E07B2F |
+| 「阶段标准」右侧文字 | 阶段标准 | 纯文本，可用「 \| 」分隔 |
+| 「销售动作」右侧文字 | 销售动作 | 纯文本，可用「 \| 」分隔 |
+| 「CD立项」右侧整排链路 | 业务推进链路 | 用「→」或换行分隔步骤，最后一步自动为当前步 |
+| 流程图标签「本阶段共计 N 个子流程」 | 自动计算 | N = 流程图提示语字段里的子流程行数（即序号个数） |
+| 流程图的子流程 / 节点 / 分支 / 链接 | 流程图提示语 | 一个子流程一行，用「；」或换行分隔；节点之间用「→」分隔；节点写成「文字 https://链接」即带点入链接；分支节点写成「（设计分支1）文字 https://链接」，自动生成可展开的分支行；文字为「本阶段结束」的节点不生成色块（版面固定保留底部「本阶段结束」一行） |
+| ❓销售做什么 下的条目 | 销售做什么 | 一行一条；右侧 01/02… 自动编号；默认显示 6 条，超出折叠可展开 |
+| ❓向谁要什么 下的条目 | 向谁要什么 | 同上 |
+
+## 二、复用规则（只改内容，不改设计）
+
+1. 只修改文件顶部 `var BOARD = { ... }` 里的字段内容；
+2. 不要改 CSS、字号、颜色、版面布局与动效；
+3. 内容过多时的默认行为：流程图按可用空间等比缩放、四边留白 ≥3mm；两个 ❓ 列表默认显示 6 条，其余折叠为「展开全部 N 条 ▾」；
+4. 改完直接打开文件即可，无需其它调整；换一行数据即换一张板块图；
+5. 右下角「说明 / 源码」为交付入口，正式使用时可直接删除，不影响看板。
+
+## 三、版式与交互（不要改动）
+
+- 左：流程图色块（标签行 + 画布 + 本阶段结束）；右：阶段标准、销售动作、❓销售做什么、❓向谁要什么
+- 流程图色块与右侧间隔 3mm，左右等高，整板锁定一屏
+- 流程图节点为「圆点 + 文字 + 椭圆灰色胶囊（固定 168×80px）」，一排最多 5 个、超出自动换行（续行与首行左对齐），文字自动换行并可按需缩小字号、保证全部展示；`【…】` 内容为品牌橙；有链接的节点右侧带点入链接斜线箭头；主干连线实线、分支行虚线；悬停单个胶囊放大 1.5 倍并置顶；点画布空白或右上角按钮进入全屏；点分支胶囊就地展开分支行
+- ❓列表面板上下等分；条目右侧 01/02… 自动编号；悬停轻微放大；超过 6 条自动折叠可展开
+
+## 四、设计规范（令牌）
+
+- **颜色**：主深蓝 `#1A3A5C`（序号圆底 / 阶段色块 / 链路激活 / 标题）；品牌橙 `#E07B2F`（环节名称、`【…】` 高亮、点入链接箭头、分支三角、「本阶段结束」）；绿 `#22C55E`（胶囊圆点、图标点击反馈）；分支边框 `#E14B4B`；色块底 `#F4F5F6`、边框 `#E6E9ED`；正文 `#1F2937`、次级 `#71717A`。
+- **连线**：主干实线 `#C9CFD6` 1.6px；分支行虚线 `#A9B4C0` 1.4px（5,5）。
+- **字体**：PingFang SC / Microsoft YaHei / Noto Sans SC；序号与阶段标题 20px/800；胶囊文字 12.5px/600（过长自动降到 7px）；链路标题 14px/600；❓内容 14px/500。
+- **尺寸**：序号圆 36px；阶段色块 padding 6×18、radius 10；胶囊固定 168×80px、radius 999、内边距 22（一排最多 5 个、超出换行，间距 18px）；圆点 7px；流程图行距 18、行号 top = 行顶 + 28；色块内边距 3mm；左右两栏 2fr:1fr、间隔 3mm。
+- **动效**：胶囊悬停放大 1.5 倍并置顶；分支三角展开/按下变绿；链路文字悬停放大 1.1 倍；❓条目悬停放大 1.06 倍；点入链接箭头默认橙、点击绿；全屏浮层按 Esc / × / 点遮罩关闭。
+- **一屏规则**：页面 `height:100dvh;overflow:hidden`，各层 `min-height:0` + grid 行 `minmax(0,1fr)`；流程图等比缩放（上限 1.25）且内容从左侧顶部开始排列。
+
+## 五、字段写法示例
+
+- `"业务推进链路": "销售监控前后台产品运营正常 → 销售组沟通异常 → 联动VC组中台递出诉求"`
+- `"流程图提示语": "确定僵尸 https://… →僵尸修改图文→（设计分支1）同三级分类合并 https://… →本阶段结束；NEW MODEL→销售填写A+外链表 https://… →运营提报OA；"`
+- `"销售做什么": "品类规划一页纸（模板）\n坑位拉通记录表\n品类方向提案（汇报版）"`
+</script>
+<script>
+  (function(){
+    var ov = document.getElementById("doc-ov"), btn = document.getElementById("doc-btn"), closeBtn = document.getElementById("doc-close");
+    var tabs = [].slice.call(document.querySelectorAll(".doc-tab"));
+    var panes = [].slice.call(document.querySelectorAll(".doc-pane"));
+    var srcPre = document.getElementById("src-pre");
+    var mm = /Mac|iPhone|iPad/.test(navigator.platform || "") ? "Cmd+C" : "Ctrl+C";
+    function showTab(name){
+      tabs.forEach(function(t){ t.classList.toggle("is-on", t.getAttribute("data-tab") === name); });
+      panes.forEach(function(p){ p.classList.toggle("is-on", p.getAttribute("data-pane") === name); });
+    }
+    function grab(){
+      if(!srcPre) return "";
+      srcPre.textContent = "";
+      var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+      srcPre.textContent = html;
+      return html;
+    }
+    function openDoc(tab){
+      ov.classList.add("show");
+      if(tab) showTab(tab);
+      var u = document.getElementById("self-url");
+      if(u) u.textContent = "预览地址：" + location.href;
+    }
+    function hideDoc(){ ov.classList.remove("show"); }
+    function copyText(text, label){
+      var done = function(){ if(label) label.textContent = "已复制"; setTimeout(function(){ if(label) label.textContent = label.getAttribute("data-t") || "复制"; }, 1200); };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done, function(){ fallback(); });
+      } else { fallback(); }
+      function fallback(){
+        var ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); done(); } catch(e){}
+        document.body.removeChild(ta);
+      }
+    }
+    function setLabel(btn2, txt){ if(!btn2) return; if(!btn2.getAttribute("data-t")) btn2.setAttribute("data-t", btn2.textContent); btn2.textContent = txt; setTimeout(function(){ btn2.textContent = btn2.getAttribute("data-t"); }, 1200); }
+    if(btn) btn.addEventListener("click", function(){ openDoc("map"); });
+    if(closeBtn) closeBtn.addEventListener("click", hideDoc);
+    if(ov) ov.addEventListener("click", function(e){ if(e.target === ov) hideDoc(); });
+    document.addEventListener("keydown", function(e){ if(e.key === "Escape") hideDoc(); });
+    tabs.forEach(function(t){ t.addEventListener("click", function(){ showTab(t.getAttribute("data-tab")); }); });
+    var copyMd = document.getElementById("copy-md");
+    if(copyMd) copyMd.addEventListener("click", function(){
+      var el = document.getElementById("md-src");
+      copyText(el ? el.textContent : "", copyMd); setLabel(copyMd, "已复制");
+    });
+    var openSelf = document.getElementById("open-self");
+    if(openSelf) openSelf.addEventListener("click", function(){ window.open(location.href, "_blank"); });
+    var copySrc = document.getElementById("copy-src");
+    if(copySrc) copySrc.addEventListener("click", function(){ copyText(grab(), null); setLabel(copySrc, "已复制"); });
+    var loadSrc = document.getElementById("load-src");
+    if(loadSrc) loadSrc.addEventListener("click", function(){ grab(); setLabel(loadSrc, "已抓取"); });
+    var dlSrc = document.getElementById("dl-src");
+    if(dlSrc) dlSrc.addEventListener("click", function(){
+      var html = (srcPre && srcPre.textContent && srcPre.textContent.indexOf("<!DOCTYPE") === 0) ? srcPre.textContent : grab();
+      var name = (document.title || "stage-board").replace(/[\\/:*?"<>|]/g, "") + ".html";
+      var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 500);
+      setLabel(dlSrc, "已下载");
+    });
+  })();
+</script>
+
+<!-- 链路条自适应：自动缩小字号，保证一排完整展示 -->
+<script>
+(function(){
+  function fitChain(){
+    var nav=document.querySelector(".chain-card .st-nav"); if(!nav) return;
+    var titles=[].slice.call(nav.querySelectorAll(".st-title")); if(!titles.length) return;
+    var fs=14, guard=0;
+    titles.forEach(function(t){ t.style.fontSize=fs+"px"; });
+    while(guard++<44){
+      var over=false;
+      for(var i=0;i<titles.length;i++){ if(titles[i].scrollWidth>titles[i].clientWidth+1){ over=true; break; } }
+      if(!over||fs<=7) break;
+      fs-=0.5;
+      titles.forEach(function(t){ t.style.fontSize=fs+"px"; });
+    }
+  }
+  window.__fitChain=fitChain;
+  setTimeout(fitChain,0); setTimeout(fitChain,260);
+  window.addEventListener("resize",function(){ setTimeout(fitChain,120); });
+  /* 中文字体加载完成后再校正一次，保证一排完整展示 */
+  window.addEventListener("load",function(){ setTimeout(fitChain,60); });
+  if(document.fonts && document.fonts.ready && document.fonts.ready.then){ document.fonts.ready.then(function(){ setTimeout(fitChain,80); }); }
+})();
+</script>
+</body>
+</html>
