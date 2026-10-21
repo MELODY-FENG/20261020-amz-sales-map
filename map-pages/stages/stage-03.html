@@ -296,8 +296,8 @@ body{
   background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:grab}
 .list-item:active{cursor:grabbing}
 .list-item p{margin:0;flex:1;min-width:0;font-size:14px;font-weight:500;color:#18181B;
-  white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;
-  -webkit-line-clamp:2;text-overflow:ellipsis}
+  line-height:1.45;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:3;text-overflow:ellipsis;word-break:keep-all;overflow-wrap:break-word}
 .li-val{flex:none;font-size:12px;color:#71717A;white-space:nowrap}
 .li-ic{flex:none;display:inline-flex;color:#71717A}
 .list-items::-webkit-scrollbar{width:8px}
@@ -971,7 +971,7 @@ body{
   "销售动作": "做分析 | 无竞争力终止立项",
   "业务推进链路":"五看三定→PM输出立项→销售团队审核→BU团队审核→公司审核",
   "流程图提示语": "① PM准备CD文件→产销单独沟通→全新品→产销沟通会排期 https://songmicshome.feishu.cn/base/WhJXbn0P7a1Cp0sdLLqceF24noc→销售AI自动化竞调 https://songmicshome.feishu.cn/wiki/UJvGwLnGYiXC92k2IAzcBQ02nBt→销售组审核→国家线审核 https://songmicshome.feishu.cn/wiki/BWEpwvyeOiC9PfkajnJcetkinBd?from=from_parent_docx&renamingWikiNode=false&sheet=nSSvo2→销售填写IPMS https://songmicshome.feishu.cn/drive/folder/RHwYf0e4ZlRquhdyQ0PcdldQnHb→BU内审→公司上会→本阶段结束 ；\n",
-  "销售做什么": "诉求：外观/构建/分本度\n定位：坑销/节奏/渠道\n输出IPMS\n输出AI自动化竞卖分析",
+  "销售做什么": "诉求：外观/构建/分本度\n定位：坑销/节奏/渠道\n确定目标价量利：输出IPMS(初版)\n确定竞品调研范围：输出AI自动化竞调\n综合单配置：SKU数、SKU属性\n单品至综合单所有配置\n确定利润核算(初版)：出货国/发货方式/关税/采购价/尾程/退款/NPPM/CM\n风险前置(关键)",
   "向谁要什么": "PM提供利润核算\nPM提供竞卖分析\nPM确认上架节点\n主管及销售中心反馈调整建议"
 };
 
@@ -986,7 +986,7 @@ body{
             var L = RB.lines(text); if(!L.length) return "";
             return L.map(function(t, i){
               var n = (i + 1 < 10 ? "0" : "") + (i + 1);
-              return `<div class="list-item"><span class="li-dot" style="background:${dot}"></span><p>${RB.esc(t)}</p><span class="li-val">${n}</span></div>`;
+              return `<div class="list-item"><span class="li-dot" style="background:${dot}"></span><p>${RB.esc(t).replace(/([\/：])/g, "$1<wbr>")}</p><span class="li-val">${n}</span></div>`;
             }).join("");
           },
           flow: function(text, TPL){
